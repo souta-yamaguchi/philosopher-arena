@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2a251d">
 <title>哲学者アリーナ</title>
+
+<meta property="og:type"        content="website">
+<meta property="og:url"         content="https://philosopher-arena.onrender.com/">
+<meta property="og:title"       content="哲学者アリーナ">
+<meta property="og:description" content="古の賢者と問答せよ">
+<meta property="og:image"       content="https://philosopher-arena.onrender.com/static/og-image.jpg">
+<meta property="og:image:width"  content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name"   content="哲学者アリーナ">
+<meta property="og:locale"      content="ja_JP">
+
+<meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:title"       content="哲学者アリーナ">
+<meta name="twitter:description" content="古の賢者と問答せよ">
+<meta name="twitter:image"       content="https://philosopher-arena.onrender.com/static/og-image.jpg">
 <style>
   :root {
     --parchment: #f3ead4;
@@ -619,7 +634,7 @@
   <div class="selector" id="selector">
     {% for key, p in philosophers.items() %}
     <div class="card" data-id="{{ key }}" data-color="{{ p.color }}" onclick="selectPhilosopher('{{ key }}')">
-      <img class="icon" src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}">
+      <img class="icon" src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" data-fallback="{{ p.avatar }}" loading="lazy">
       <div class="pname">{{ p.name }}</div>
       <div class="pyears">{{ p.years.split('/')[0].strip() }}</div>
     </div>
@@ -698,7 +713,7 @@ function addMessage(role, name, text, color) {
     avatarHtml = '<div class="avatar">👤</div>';
   } else {
     const p = PHILOSOPHERS[current];
-    avatarHtml = `<img class="avatar" src="/static/philosophers/${p.portrait}" alt="${p.name}">`;
+    avatarHtml = `<img class="avatar" src="/static/philosophers/${p.portrait}" alt="${p.name}" data-fallback="${p.avatar}">`;
   }
   msg.innerHTML = `
     ${avatarHtml}
@@ -708,6 +723,8 @@ function addMessage(role, name, text, color) {
     </div>
   `;
   chat.appendChild(msg);
+  // 新しく追加された画像にもリトライ処理を適用
+  msg.querySelectorAll('img.avatar').forEach(setupImageRetry);
   chat.scrollTop = chat.scrollHeight;
   return msg.querySelector('.text');
 }
@@ -795,6 +812,30 @@ async function resetChat() {
   chat.innerHTML = '<div class="initial-prompt">問いを投げよ。<br>' + p.name + 'は君の問いと向き合うだろう。</div>';
   delete chatsByPhilosopher[current];
 }
+
+// 画像読み込み失敗時の自動リトライ＋フォールバック
+function setupImageRetry(img) {
+  let retries = 0;
+  img.addEventListener('error', () => {
+    if (retries < 2) {
+      retries++;
+      const orig = img.dataset.origSrc || img.src.split('?')[0];
+      img.dataset.origSrc = orig;
+      setTimeout(() => { img.src = orig + '?retry=' + Date.now(); }, 800 * retries);
+    } else {
+      // 2回失敗 → 絵文字にフォールバック
+      const fallback = img.dataset.fallback || '？';
+      const span = document.createElement('span');
+      span.textContent = fallback;
+      span.className = img.className;
+      span.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;font-size:24px;background:#3b332a;color:#e8e1cc;';
+      span.style.width = img.offsetWidth + 'px' || '40px';
+      span.style.height = img.offsetHeight + 'px' || '40px';
+      img.replaceWith(span);
+    }
+  });
+}
+document.querySelectorAll('img.icon, img.bust').forEach(setupImageRetry);
 
 function closeWelcome() {
   const m = document.getElementById('welcomeModal');

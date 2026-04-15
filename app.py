@@ -33,9 +33,13 @@ client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 
 @app.after_request
-def no_cache(response):
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
+def cache_policy(response):
+    # 静的ファイル（画像・CSS等）は1日キャッシュ、それ以外（HTML/JSON）はno-cache
+    if request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "public, max-age=86400"
+    else:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
     return response
 
 
