@@ -341,9 +341,96 @@
     padding: 20px;
     font-style: italic;
   }
+
+  /* Welcome modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 16, 10, 0.7);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeBg 0.3s ease-out;
+  }
+  @keyframes fadeBg { from { opacity: 0; } to { opacity: 1; } }
+  .welcome {
+    position: relative;
+    background:
+      radial-gradient(circle at 20% 0%, #fffbee, transparent 40%),
+      var(--parchment);
+    color: var(--ink);
+    max-width: 520px;
+    margin: 20px;
+    padding: 40px 38px 34px;
+    border: 2px solid var(--gold);
+    border-radius: 6px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    animation: fadeUp 0.4s ease-out;
+    text-align: center;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .welcome .pillar {
+    color: var(--gold);
+    font-size: 32px;
+    letter-spacing: 8px;
+    margin-bottom: 8px;
+  }
+  .welcome h2 {
+    font-size: 22px;
+    letter-spacing: 4px;
+    margin: 0 0 18px;
+    font-weight: normal;
+  }
+  .welcome p {
+    line-height: 2;
+    font-size: 15px;
+    margin: 10px 0;
+    color: #3b332a;
+  }
+  .welcome .sig {
+    margin-top: 18px;
+    font-style: italic;
+    color: var(--bronze);
+    font-size: 13px;
+    letter-spacing: 2px;
+  }
+  .welcome .close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: #8b8368;
+    font-size: 22px;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    line-height: 1;
+  }
+  .welcome .close:hover {
+    background: rgba(167, 125, 60, 0.15);
+    color: var(--ink);
+  }
 </style>
 </head>
 <body>
+
+<div id="welcomeModal" class="modal-backdrop" onclick="if(event.target===this) closeWelcome()">
+  <div class="welcome">
+    <button class="close" onclick="closeWelcome()" aria-label="閉じる">×</button>
+    <div class="pillar">⚯</div>
+    <h2>ようこそ、哲学者アリーナへ</h2>
+    <p>ここは、古の賢者たちが集まる秘密の場所。</p>
+    <p>あなたの悩みに、賢者たちはきっと<br>答えてくれることでしょう……</p>
+    <div class="sig">— 問いを携えて、入りたまえ —</div>
+  </div>
+</div>
+
 
 <header>
   <h1>哲学者アリーナ <span class="gk">— 古の賢者と問答せよ —</span></h1>
@@ -531,6 +618,16 @@ async function resetChat() {
   chat.innerHTML = '<div class="initial-prompt">問いを投げよ。<br>' + p.name + 'は君の問いと向き合うだろう。</div>';
   delete chatsByPhilosopher[current];
 }
+
+function closeWelcome() {
+  const m = document.getElementById('welcomeModal');
+  m.style.display = 'none';
+  input.focus();
+}
+// Esc キーでも閉じる
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeWelcome();
+});
 
 // Initialize
 document.querySelector('.selector .card[data-id="socrates"]').classList.add('active');
