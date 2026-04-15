@@ -87,10 +87,22 @@
     box-shadow: inset 0 0 0 1px var(--gold), 0 2px 6px rgba(0,0,0,0.12);
   }
   .selector .icon {
-    font-size: 28px;
-    line-height: 1;
-    margin-bottom: 6px;
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 6px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #c9bf9f;
+    display: block;
+    filter: sepia(0.15);
   }
+  .card.active .icon {
+    border-color: var(--gold);
+    filter: none;
+  }
+  .card[data-color="crimson"].active .icon { border-color: var(--crimson); }
+  .card[data-color="navy"].active .icon { border-color: var(--navy); }
+  .card[data-color="slate"].active .icon { border-color: var(--slate); }
   .selector .pname {
     font-size: 14px;
     letter-spacing: 1.5px;
@@ -126,20 +138,16 @@
   .philosopher-card.slate   { border-color: var(--slate); background: #e2e5eb; }
 
   .philosopher-card .bust {
-    width: 72px;
-    height: 72px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #d9c89e, #8b5a2b);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 36px;
+    object-fit: cover;
     border: 3px solid var(--bronze);
     flex-shrink: 0;
   }
-  .philosopher-card.crimson .bust { background: radial-gradient(circle at 35% 30%, #e2b5b5, #8b2a2a); border-color: var(--crimson); }
-  .philosopher-card.navy .bust { background: radial-gradient(circle at 35% 30%, #b3c2d9, #1e3a5f); border-color: var(--navy); }
-  .philosopher-card.slate .bust { background: radial-gradient(circle at 35% 30%, #c5cdd9, #4a5568); border-color: var(--slate); }
+  .philosopher-card.crimson .bust { border-color: var(--crimson); }
+  .philosopher-card.navy .bust    { border-color: var(--navy); }
+  .philosopher-card.slate .bust   { border-color: var(--slate); }
 
   .philosopher-card .info h2 {
     margin: 0 0 2px;
@@ -190,24 +198,25 @@
   }
   .msg.user { flex-direction: row-reverse; }
   .msg .avatar {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
+    object-fit: cover;
     flex-shrink: 0;
     border: 2px solid transparent;
   }
   .msg.user .avatar {
     background: #dfe6d4;
     border-color: var(--olive);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
   }
-  .msg.ai.bronze .avatar { background: radial-gradient(circle at 35% 30%, #d9c89e, #8b5a2b); border-color: var(--bronze); }
-  .msg.ai.crimson .avatar { background: radial-gradient(circle at 35% 30%, #e2b5b5, #8b2a2a); border-color: var(--crimson); }
-  .msg.ai.navy .avatar { background: radial-gradient(circle at 35% 30%, #b3c2d9, #1e3a5f); border-color: var(--navy); }
-  .msg.ai.slate .avatar { background: radial-gradient(circle at 35% 30%, #c5cdd9, #4a5568); border-color: var(--slate); }
+  .msg.ai.bronze .avatar { border-color: var(--bronze); }
+  .msg.ai.crimson .avatar { border-color: var(--crimson); }
+  .msg.ai.navy .avatar { border-color: var(--navy); }
+  .msg.ai.slate .avatar { border-color: var(--slate); }
 
   .msg .bubble {
     background: var(--parchment);
@@ -346,7 +355,7 @@
   <div class="selector" id="selector">
     {% for key, p in philosophers.items() %}
     <div class="card" data-id="{{ key }}" data-color="{{ p.color }}" onclick="selectPhilosopher('{{ key }}')">
-      <div class="icon">{{ p.avatar }}</div>
+      <img class="icon" src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}">
       <div class="pname">{{ p.name }}</div>
       <div class="pyears">{{ p.years.split('/')[0].strip() }}</div>
     </div>
@@ -354,7 +363,7 @@
   </div>
 
   <div id="philosopher-card" class="philosopher-card">
-    <div class="bust" id="bust">🗣</div>
+    <img class="bust" id="bust" src="/static/philosophers/socrates.jpg" alt="">
     <div class="info">
       <h2 id="pname">ソクラテス<span class="gk" id="pgreek">Σωκράτης</span></h2>
       <p id="pyears">紀元前470年頃 – 紀元前399年 / アテナイ</p>
@@ -406,7 +415,7 @@ function selectPhilosopher(key) {
   const p = PHILOSOPHERS[key];
   const card = document.getElementById('philosopher-card');
   card.className = 'philosopher-card ' + p.color;
-  document.getElementById('bust').textContent = p.avatar;
+  document.getElementById('bust').src = '/static/philosophers/' + p.portrait;
   document.getElementById('pname').childNodes[0].textContent = p.name;
   document.getElementById('pgreek').textContent = p.greek;
   document.getElementById('pyears').textContent = p.years;
@@ -417,16 +426,18 @@ function selectPhilosopher(key) {
 }
 
 function addMessage(role, name, text, color) {
-  // Clear initial prompt if present
-  if (chat.querySelector('.initial-prompt')) {
-    chat.innerHTML = '';
-  }
+  if (chat.querySelector('.initial-prompt')) chat.innerHTML = '';
   const msg = document.createElement('div');
-  const cls = role === 'user' ? 'msg user' : 'msg ai ' + color;
-  msg.className = cls;
-  const avatar = role === 'user' ? '👤' : PHILOSOPHERS[current].avatar;
+  msg.className = role === 'user' ? 'msg user' : 'msg ai ' + color;
+  let avatarHtml;
+  if (role === 'user') {
+    avatarHtml = '<div class="avatar">👤</div>';
+  } else {
+    const p = PHILOSOPHERS[current];
+    avatarHtml = `<img class="avatar" src="/static/philosophers/${p.portrait}" alt="${p.name}">`;
+  }
   msg.innerHTML = `
-    <div class="avatar">${avatar}</div>
+    ${avatarHtml}
     <div style="max-width:75%">
       <div class="name">${name}</div>
       <div class="bubble"><div class="text"></div></div>

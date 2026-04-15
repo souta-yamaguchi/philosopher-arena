@@ -45,25 +45,25 @@ PHILOSOPHERS = {
         "name": "ソクラテス", "greek": "Σωκράτης",
         "years": "紀元前470年頃 – 紀元前399年 / アテナイ",
         "quote": "吟味されざる生は、生きるに値しない",
-        "avatar": "🗣", "color": "bronze",
+        "avatar": "🗣", "portrait": "socrates.jpg", "color": "bronze",
     },
     "nietzsche": {
         "name": "ニーチェ", "greek": "Friedrich Nietzsche",
         "years": "1844 – 1900 / プロイセン",
         "quote": "神は死んだ。我々が神を殺したのだ",
-        "avatar": "⚡", "color": "crimson",
+        "avatar": "⚡", "portrait": "nietzsche.jpg", "color": "crimson",
     },
     "kant": {
         "name": "カント", "greek": "Immanuel Kant",
         "years": "1724 – 1804 / ケーニヒスベルク",
         "quote": "わが上なる星輝く空と、わが内なる道徳法則",
-        "avatar": "⚖", "color": "navy",
+        "avatar": "⚖", "portrait": "kant.jpg", "color": "navy",
     },
     "wittgenstein": {
         "name": "ウィトゲンシュタイン", "greek": "Ludwig Wittgenstein",
         "years": "1889 – 1951 / ウィーン〜ケンブリッジ",
         "quote": "語りえぬものについては、沈黙せねばならぬ",
-        "avatar": "🪜", "color": "slate",
+        "avatar": "🪜", "portrait": "wittgenstein.jpg", "color": "slate",
     },
 }
 
