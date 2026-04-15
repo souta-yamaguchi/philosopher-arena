@@ -93,12 +93,8 @@ PERSONAS = {k: load_persona(k) + LENGTH_RULE for k in PHILOSOPHERS}
 
 
 # ── Rate limiting ─────────────────────────────────────────────
-IP_LIMIT_PER_MIN = 6
-IP_LIMIT_PER_DAY = 40
-GLOBAL_DAILY_CAP = 500
+GLOBAL_DAILY_CAP = 100  # 全員合算 / 1日
 
-_ip_minute: dict[str, deque] = defaultdict(deque)
-_ip_day:    dict[str, deque] = defaultdict(deque)
 _global_day: deque = deque()
 _lock = Lock()
 
@@ -112,17 +108,9 @@ def _prune(dq: deque, window_sec: float):
 def check_rate_limit(ip: str) -> tuple[bool, str]:
     now = time.time()
     with _lock:
-        _prune(_ip_minute[ip], 60)
-        _prune(_ip_day[ip], 86400)
         _prune(_global_day, 86400)
         if len(_global_day) >= GLOBAL_DAILY_CAP:
             return False, "本日のサイト全体の上限に達しました。また明日お試しください。"
-        if len(_ip_minute[ip]) >= IP_LIMIT_PER_MIN:
-            return False, "短時間にリクエストが多すぎます。1分ほどお待ちください。"
-        if len(_ip_day[ip]) >= IP_LIMIT_PER_DAY:
-            return False, "本日の利用上限に達しました。明日また問いを持ってきてください。"
-        _ip_minute[ip].append(now)
-        _ip_day[ip].append(now)
         _global_day.append(now)
         return True, ""
 
