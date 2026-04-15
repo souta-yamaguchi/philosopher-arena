@@ -515,12 +515,20 @@
       width: 38px;
       height: 38px;
     }
+    /* バブル外側の wrapper（addMessage で max-width:75% inline指定）を上書き */
+    .msg > div[style*="max-width"] {
+      max-width: calc(100% - 50px) !important;
+      flex: 1;
+    }
     .msg .bubble {
       padding: 10px 13px;
       font-size: 15px;
-      line-height: 1.7;
-      max-width: 80%;
+      line-height: 1.8;
+      max-width: 100%;
+      word-break: normal;
+      overflow-wrap: break-word;
     }
+    .msg.user .bubble { max-width: 100%; }
     .msg .name {
       font-size: 11px;
     }
