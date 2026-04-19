@@ -6,6 +6,7 @@
 """
 import os
 import json
+import random
 import time
 import secrets
 from pathlib import Path
@@ -89,11 +90,37 @@ LENGTH_RULE = """
 """
 
 
+GROUP_RULE_TEMPLATE = """
+
+---
+
+## 【円卓会議ルール】
+
+あなたは今、アリーナの円卓で {others} と共に討論している。
+ユーザが投げたテーマに対し、他の哲学者も順に発言する。
+
+- **直前までの発言を必ず踏まえよ**。前の発言で既に出た論点の単なる繰り返しは禁物
+- 同意するなら短く頷き、反論するなら名前を呼んで鋭く切り返せ（例：「ソクラテスよ、君の問いは〜」）
+- 新しい視点・角度を一つ持ち込むこと
+- 司会は不要。長い前置きや自己紹介は不要
+- 3〜5 文で打ち切れ
+- 他者の発言を要約するだけの応答は禁止
+"""
+
+
 def load_persona(name: str) -> str:
     return (BASE / "philosophers" / f"{name}.md").read_text(encoding="utf-8")
 
 
 PERSONAS = {k: load_persona(k) + LENGTH_RULE for k in PHILOSOPHERS}
+
+
+def group_system_prompt(speaker_key: str) -> str:
+    """円卓会議用の system prompt。speaker 以外の 3 名の名前を埋め込む。"""
+    others = "、".join(
+        PHILOSOPHERS[k]["name"] for k in PHILOSOPHERS if k != speaker_key
+    )
+    return PERSONAS[speaker_key] + GROUP_RULE_TEMPLATE.format(others=others)
 
 
 # ── Rate limiting ─────────────────────────────────────────────
@@ -206,6 +233,76 @@ def chat():
                 full_text += text
                 yield f"data: {json.dumps({'text': text}, ensure_ascii=False)}\n\n"
         history.append({"role": "assistant", "content": full_text})
+        yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+
+@app.route("/group-chat", methods=["POST"])
+@login_required
+def group_chat():
+    """円卓会議：4哲学者がランダム順に、前の発言を踏まえて議論する"""
+    ip = client_ip()
+    # 4 人分の API 呼び出しなので、事前に 4 回分の空きがあるか確認
+    with _lock:
+        _prune(_global_day, 86400)
+        if len(_global_day) + len(PHILOSOPHERS) > GLOBAL_DAILY_CAP:
+            return jsonify({
+                "error": "本日のサイト全体の上限に達しました。また明日お試しください。"
+            }), 429
+        # 枠を 4 人分先に予約
+        now = time.time()
+        for _ in range(len(PHILOSOPHERS)):
+            _global_day.append(now)
+
+    data = request.get_json()
+    session_id = data.get("session_id", "default")
+    topic = data.get("message", "").strip()
+    if not topic:
+        return jsonify({"error": "topic required"}), 400
+
+    sess = conversations.setdefault(session_id, {})
+    history = sess.setdefault("_group", [])
+    history.append({"role": "user", "content": topic})
+
+    # ランダム順に発言者を決める
+    order = list(PHILOSOPHERS.keys())
+    random.shuffle(order)
+
+    def generate():
+        # 1) 発言順をクライアントに通知
+        yield f"data: {json.dumps({'order': order}, ensure_ascii=False)}\n\n"
+
+        # 2) 各哲学者が順に発言
+        for key in order:
+            name = PHILOSOPHERS[key]["name"]
+            # 発言者切り替え通知
+            yield f"data: {json.dumps({'start': key}, ensure_ascii=False)}\n\n"
+
+            system_blocks = [
+                {
+                    "type": "text",
+                    "text": group_system_prompt(key),
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+            full_text = ""
+            with client.messages.stream(
+                model="claude-sonnet-4-5",
+                max_tokens=700,
+                system=system_blocks,
+                messages=history,
+            ) as stream:
+                for text in stream.text_stream:
+                    full_text += text
+                    yield f"data: {json.dumps({'philosopher': key, 'text': text}, ensure_ascii=False)}\n\n"
+
+            # 履歴に話者名プレフィックス付きで追記 → 次の哲学者が参照できる
+            history.append({
+                "role": "assistant",
+                "content": f"【{name}】{full_text}",
+            })
+
         yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
 
     return Response(stream_with_context(generate()), mimetype="text/event-stream")

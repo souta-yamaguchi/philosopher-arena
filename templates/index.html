@@ -79,7 +79,7 @@
   /* 哲学者セレクタ */
   .selector {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 10px;
     margin-bottom: 20px;
   }
@@ -120,6 +120,42 @@
   .card[data-color="crimson"].active .icon { border-color: var(--crimson); }
   .card[data-color="navy"].active .icon { border-color: var(--navy); }
   .card[data-color="slate"].active .icon { border-color: var(--slate); }
+
+  /* Group selector card: 2x2 portrait grid */
+  .selector .icon-group {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 6px;
+    border-radius: 50%;
+    border: 2px solid #c9bf9f;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    overflow: hidden;
+    background: #3b332a;
+  }
+  .card[data-id="group"].active .icon-group { border-color: var(--gold); }
+  .selector .icon-group img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* Group philosopher-card (大): 4 portraits in a row */
+  .philosopher-card.group { border-color: var(--gold); background: var(--marble); }
+  .philosopher-card.group .bust-group {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .philosopher-card.group .bust-group img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--gold);
+  }
   .selector .pname {
     font-size: 14px;
     letter-spacing: 1.5px;
@@ -477,10 +513,15 @@
     .selector .card {
       padding: 8px 4px;
     }
-    .selector .icon {
+    .selector .icon,
+    .selector .icon-group {
       width: 44px;
       height: 44px;
       margin-bottom: 4px;
+    }
+    .philosopher-card.group .bust-group img {
+      width: 36px;
+      height: 36px;
     }
     .selector .pname {
       font-size: 12px;
@@ -639,10 +680,24 @@
       <div class="pyears">{{ p.years.split('/')[0].strip() }}</div>
     </div>
     {% endfor %}
+    <div class="card" data-id="group" data-color="gold" onclick="selectPhilosopher('group')">
+      <div class="icon-group">
+        {% for key, p in philosophers.items() %}
+        <img src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" loading="lazy">
+        {% endfor %}
+      </div>
+      <div class="pname">全員</div>
+      <div class="pyears">円卓会議</div>
+    </div>
   </div>
 
   <div id="philosopher-card" class="philosopher-card">
     <img class="bust" id="bust" src="/static/philosophers/socrates.jpg" alt="">
+    <div class="bust-group" id="bustGroup" style="display:none">
+      {% for key, p in philosophers.items() %}
+      <img src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" loading="lazy">
+      {% endfor %}
+    </div>
     <div class="info">
       <h2 id="pname">ソクラテス<span class="gk" id="pgreek">Σωκράτης</span></h2>
       <p id="pyears">紀元前470年頃 – 紀元前399年 / アテナイ</p>
@@ -690,29 +745,49 @@ function selectPhilosopher(key) {
   document.querySelectorAll('.selector .card').forEach(c => {
     c.classList.toggle('active', c.dataset.id === key);
   });
-  // Update header card
-  const p = PHILOSOPHERS[key];
+
   const card = document.getElementById('philosopher-card');
-  card.className = 'philosopher-card ' + p.color;
-  document.getElementById('bust').src = '/static/philosophers/' + p.portrait;
-  document.getElementById('pname').childNodes[0].textContent = p.name;
-  document.getElementById('pgreek').textContent = p.greek;
-  document.getElementById('pyears').textContent = p.years;
-  document.getElementById('pquote').textContent = '"' + p.quote + '"';
-  // Restore chat
-  chat.innerHTML = chatsByPhilosopher[key] || '<div class="initial-prompt">問いを投げよ。<br>' + p.name + 'は君の問いと向き合うだろう。</div>';
+  const bust = document.getElementById('bust');
+  const bustGroup = document.getElementById('bustGroup');
+
+  if (key === 'group') {
+    card.className = 'philosopher-card group';
+    bust.style.display = 'none';
+    bustGroup.style.display = 'flex';
+    document.getElementById('pname').childNodes[0].textContent = '円卓会議';
+    document.getElementById('pgreek').textContent = '';
+    document.getElementById('pyears').textContent = '4 人の賢者が集う';
+    document.getElementById('pquote').textContent = '— 問いを投げよ。彼らは共に考える —';
+    chat.innerHTML = chatsByPhilosopher[key] ||
+      '<div class="initial-prompt">テーマを投げよ。<br>4 人の賢者が、順に答えを返すだろう。</div>';
+  } else {
+    const p = PHILOSOPHERS[key];
+    card.className = 'philosopher-card ' + p.color;
+    bust.style.display = '';
+    bustGroup.style.display = 'none';
+    bust.src = '/static/philosophers/' + p.portrait;
+    document.getElementById('pname').childNodes[0].textContent = p.name;
+    document.getElementById('pgreek').textContent = p.greek;
+    document.getElementById('pyears').textContent = p.years;
+    document.getElementById('pquote').textContent = '"' + p.quote + '"';
+    chat.innerHTML = chatsByPhilosopher[key] ||
+      '<div class="initial-prompt">問いを投げよ。<br>' + p.name + 'は君の問いと向き合うだろう。</div>';
+  }
   chat.scrollTop = chat.scrollHeight;
 }
 
-function addMessage(role, name, text, color) {
+function addMessage(role, name, text, color, philosopherKey) {
+  // philosopherKey を指定すればその哲学者のアバター/色で描画（グループ用）
   if (chat.querySelector('.initial-prompt')) chat.innerHTML = '';
   const msg = document.createElement('div');
-  msg.className = role === 'user' ? 'msg user' : 'msg ai ' + color;
   let avatarHtml;
   if (role === 'user') {
+    msg.className = 'msg user';
     avatarHtml = '<div class="avatar">👤</div>';
   } else {
-    const p = PHILOSOPHERS[current];
+    const key = philosopherKey || current;
+    const p = PHILOSOPHERS[key];
+    msg.className = 'msg ai ' + p.color;
     avatarHtml = `<img class="avatar" src="/static/philosophers/${p.portrait}" alt="${p.name}" data-fallback="${p.avatar}">`;
   }
   msg.innerHTML = `
@@ -723,7 +798,6 @@ function addMessage(role, name, text, color) {
     </div>
   `;
   chat.appendChild(msg);
-  // 新しく追加された画像にもリトライ処理を適用
   msg.querySelectorAll('img.avatar').forEach(setupImageRetry);
   chat.scrollTop = chat.scrollHeight;
   return msg.querySelector('.text');
@@ -734,6 +808,11 @@ async function send() {
   if (!message) return;
   input.value = '';
   sendBtn.disabled = true;
+
+  if (current === 'group') {
+    await sendGroup(message);
+    return;
+  }
 
   const p = PHILOSOPHERS[current];
   addMessage('user', '君', message, '').textContent = message;
@@ -801,15 +880,103 @@ async function send() {
   }
 }
 
+async function sendGroup(message) {
+  addMessage('user', '君', message, '').textContent = message;
+
+  // 文字キュー: 各要素は { ch, target } 形式。
+  // target に textEl を一緒に記憶するので、次の哲学者に切り替わっても
+  // 前の哲学者の残り文字が混ざらない
+  let currentTextEl = null;
+  let charQueue = [];
+  let streamDone = false;
+  const TYPE_INTERVAL_MS = 30;
+
+  const typer = setInterval(() => {
+    if (charQueue.length === 0) {
+      if (streamDone) {
+        clearInterval(typer);
+        sendBtn.disabled = false;
+        input.focus();
+      }
+      return;
+    }
+    const {ch, target} = charQueue.shift();
+    const span = document.createElement('span');
+    span.className = 'ch';
+    span.textContent = ch;
+    target.appendChild(span);
+    requestAnimationFrame(() => { span.style.opacity = '1'; });
+    chat.scrollTop = chat.scrollHeight;
+  }, TYPE_INTERVAL_MS);
+
+  try {
+    const res = await fetch('/group-chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: SESSION_ID, message})
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      streamDone = true;
+      clearInterval(typer);
+      const t = addMessage('ai', 'システム', '', 'bronze', 'socrates');
+      t.textContent = err.error || '（エラー: ' + res.status + '）';
+      sendBtn.disabled = false;
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = JSON.parse(line.slice(6));
+
+        if (data.order) {
+          // 順序通知のみ、UI 操作はなし
+        } else if (data.start) {
+          // 新しい哲学者の発言開始 → 新バブルを作る
+          currentTextEl = addMessage('ai', PHILOSOPHERS[data.start].name, '', null, data.start);
+        } else if (data.text && currentTextEl) {
+          // その時点の textEl と一緒にキューに積む
+          const target = currentTextEl;
+          for (const ch of data.text) charQueue.push({ch, target});
+        } else if (data.done) {
+          streamDone = true;
+        }
+      }
+    }
+    streamDone = true;
+  } catch (e) {
+    clearInterval(typer);
+    const t = addMessage('ai', 'システム', '', 'bronze', 'socrates');
+    t.textContent = '（対話が途絶えた: ' + e.message + '）';
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
 async function resetChat() {
-  if (!confirm(PHILOSOPHERS[current].name + 'との対話をリセットしますか？')) return;
+  const label = current === 'group' ? '円卓会議' : PHILOSOPHERS[current].name + 'との対話';
+  if (!confirm(label + 'をリセットしますか？')) return;
+  const philosopherParam = current === 'group' ? '_group' : current;
   await fetch('/reset', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({session_id: SESSION_ID, philosopher: current})
+    body: JSON.stringify({session_id: SESSION_ID, philosopher: philosopherParam})
   });
-  const p = PHILOSOPHERS[current];
-  chat.innerHTML = '<div class="initial-prompt">問いを投げよ。<br>' + p.name + 'は君の問いと向き合うだろう。</div>';
+  if (current === 'group') {
+    chat.innerHTML = '<div class="initial-prompt">テーマを投げよ。<br>4 人の賢者が、順に答えを返すだろう。</div>';
+  } else {
+    const p = PHILOSOPHERS[current];
+    chat.innerHTML = '<div class="initial-prompt">問いを投げよ。<br>' + p.name + 'は君の問いと向き合うだろう。</div>';
+  }
   delete chatsByPhilosopher[current];
 }
 
