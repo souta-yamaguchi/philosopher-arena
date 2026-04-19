@@ -792,25 +792,23 @@
       font-size: 16px;  /* iOS の自動ズーム防止 */
     }
 
-    .msg { margin: 12px 0; gap: 8px; }
+    .msg { margin: 10px 0; gap: 8px; }
     .msg .avatar {
-      width: 38px;
-      height: 38px;
+      width: 36px;
+      height: 36px;
     }
     .msg .bubble-wrap {
-      max-width: calc(100% - 50px);
+      max-width: calc(100% - 46px);
       flex: 1;
     }
     .msg .bubble {
-      padding: 10px 13px;
-      font-size: 15px;
-      line-height: 1.8;
+      padding: 8px 11px;
+      font-size: 13px;
+      line-height: 1.7;
       word-break: normal;
       overflow-wrap: break-word;
     }
-    .msg .name {
-      font-size: 11px;
-    }
+    .msg .name { font-size: 10px; }
 
     /* 入力欄をボトムに固定的に */
     .input-area {
@@ -863,6 +861,56 @@
     .welcome .sig {
       font-size: 12px;
       margin-top: 14px;
+    }
+  }
+
+  /* チャット開始後：上段を縮めてチャットを最大化（モバイルのみ） */
+  @media (max-width: 720px) {
+    body.chat-started .sidebar {
+      padding: 3px 6px;
+    }
+    body.chat-started .selector .card {
+      padding: 2px;
+      gap: 1px;
+    }
+    body.chat-started .selector .icon,
+    body.chat-started .selector .icon-group {
+      width: 30px;
+      height: 30px;
+      border-width: 1.5px;
+    }
+    body.chat-started .selector .pname {
+      font-size: 8.5px;
+      line-height: 1.1;
+    }
+    body.chat-started .philosopher-card {
+      padding: 4px 10px;
+      gap: 8px;
+    }
+    body.chat-started .philosopher-card .bust {
+      width: 32px;
+      height: 32px;
+      border-width: 1.5px;
+    }
+    body.chat-started .philosopher-card .info h2 {
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      margin-bottom: 0;
+    }
+    body.chat-started .philosopher-card .info p,
+    body.chat-started .philosopher-card .info .quote {
+      display: none;
+    }
+    body.chat-started .member-picker { gap: 2px; }
+    body.chat-started .picker-title { display: none; }
+    body.chat-started .member-chip img {
+      width: 22px;
+      height: 22px;
+    }
+    body.chat-started .member-chip .chip-name { display: none; }
+    body.chat-started .header-reset {
+      font-size: 9px !important;
+      padding: 3px 6px !important;
     }
   }
 
@@ -1074,6 +1122,7 @@ async function send() {
     return;
   }
 
+  document.body.classList.add('chat-started');
   const p = PHILOSOPHERS[current];
   addMessage('user', '君', message, '').textContent = breakAfterPeriod(message);
   const textEl = addMessage('ai', p.name, '', p.color);
@@ -1144,6 +1193,7 @@ async function send() {
 }
 
 async function sendGroup(message) {
+  document.body.classList.add('chat-started');
   addMessage('user', '君', message, '').textContent = breakAfterPeriod(message);
 
   // 哲学者別に textEl を保持。text イベントに含まれる philosopher キー
