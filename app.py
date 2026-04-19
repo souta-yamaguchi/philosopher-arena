@@ -76,13 +76,16 @@ LENGTH_RULE = """
 
 ---
 
-## 【最重要・応答長さの絶対ルール】
+## 【最重要・応答長さと形式の絶対ルール】
 
 あなたは対話をしている。独白・講義ではない。
 - 原則 3〜5 文で応答を終える
 - どんなに語りたくても最大でも 7 文を超えるな
 - 段落はひとつか、多くてふたつ
 - 箇条書きや番号列挙は禁止
+- **markdown 見出し（#, ##, ###）は絶対に使うな**
+- **複数セクションへの構造化は禁止**（ただの一続きの文章として応答せよ）
+- 水平線（---）で区切るな
 - 長大な自伝的説明、体系の展開、引用の羅列は禁物
 - 詳しく語りたければ、相手の次の問いを誘う形で余白を残せ
 
@@ -99,12 +102,20 @@ GROUP_RULE_TEMPLATE = """
 あなたは今、アリーナの円卓で {others} と共に討論している。
 ユーザが投げたテーマに対し、他の哲学者も順に発言する。
 
-- **直前までの発言を必ず踏まえよ**。前の発言で既に出た論点の単なる繰り返しは禁物
+### ❌ 絶対にやってはならぬこと
+- **他の哲学者の立場を代弁するな**（例：「## ソクラテス」「## カント」のような節を書くのは禁止）
+- **markdown 見出し（#, ##, ###）を一切使うな**
+- **複数人の見解を並べたドキュメントを書くな**（君は司会者ではない）
+- **水平線（---）で区切るな**
+- 長い前置き・自己紹介・テーマの言い換え
+
+### ✅ やるべきこと
+- **あなたは {self_name} である。他の誰でもない。{self_name} の声でのみ応答せよ**
+- 直前までの発言を必ず踏まえよ（前の発言に反論・同意・深掘りせよ）
 - 同意するなら短く頷き、反論するなら名前を呼んで鋭く切り返せ（例：「ソクラテスよ、君の問いは〜」）
 - 新しい視点・角度を一つ持ち込むこと
-- 司会は不要。長い前置きや自己紹介は不要
-- 3〜5 文で打ち切れ
-- 他者の発言を要約するだけの応答は禁止
+- 3〜5 文、**一続きの散文**で打ち切れ
+- 既に出た論点の繰り返しは禁物
 """
 
 
@@ -115,12 +126,34 @@ def load_persona(name: str) -> str:
 PERSONAS = {k: load_persona(k) + LENGTH_RULE for k in PHILOSOPHERS}
 
 
+def build_group_messages(history: list, speaker_name: str) -> list:
+    """
+    group-chat 用: 履歴を 1 本の user メッセージへ畳み込む。
+    assistant 連続によって Claude が「多観点統合文書」を書いてしまう問題を回避する。
+    """
+    parts = ["以下は円卓会議でこれまで交わされた記録である。"]
+    for m in history:
+        if m["role"] == "user":
+            parts.append(f"▼ ユーザの問い：{m['content']}")
+        else:
+            parts.append(f"▼ {m['content']}")  # 既に【name】が付いている
+    parts.append("")
+    parts.append(f"あなたは {speaker_name} である。他の誰でもない。")
+    parts.append(f"上記を踏まえ、{speaker_name} 一人の声だけで応答せよ。")
+    parts.append("他の哲学者の発言を代弁するな。markdown 見出し（#, ##, ###）も禁止。")
+    parts.append("前置きなしで、いきなり本題に入れ。3〜5 文、一続きの散文で。")
+    return [{"role": "user", "content": "\n".join(parts)}]
+
+
 def group_system_prompt(speaker_key: str) -> str:
     """円卓会議用の system prompt。speaker 以外の 3 名の名前を埋め込む。"""
+    self_name = PHILOSOPHERS[speaker_key]["name"]
     others = "、".join(
         PHILOSOPHERS[k]["name"] for k in PHILOSOPHERS if k != speaker_key
     )
-    return PERSONAS[speaker_key] + GROUP_RULE_TEMPLATE.format(others=others)
+    return PERSONAS[speaker_key] + GROUP_RULE_TEMPLATE.format(
+        self_name=self_name, others=others
+    )
 
 
 # ── Rate limiting ─────────────────────────────────────────────
@@ -286,12 +319,14 @@ def group_chat():
                     "cache_control": {"type": "ephemeral"},
                 }
             ]
+            # 履歴を単一 user メッセージへ畳み込む → assistant 連続問題を回避
+            api_messages = build_group_messages(history, name)
             full_text = ""
             with client.messages.stream(
                 model="claude-sonnet-4-5",
                 max_tokens=700,
                 system=system_blocks,
-                messages=history,
+                messages=api_messages,
             ) as stream:
                 for text in stream.text_stream:
                     full_text += text
