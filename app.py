@@ -153,6 +153,10 @@ def _sanitize_group_reply(text: str) -> str:
             text = text.split(sep)[0]
     # 5) 残った行頭の markdown 見出しを除去
     text = re.sub(r"^\s*#{1,6}[^\n]*\n?", "", text, flags=re.MULTILINE)
+    # 6) 改行を全て単一スペースに畳む（1 パラグラフで表示）
+    text = re.sub(r"\s*\n+\s*", " ", text)
+    # 7) 連続スペースを 1 つに
+    text = re.sub(r"[ \t]{2,}", " ", text)
     text = text.strip()
     if not text or text in ("——", "—", "-"):
         text = "（この賢者は今、言葉を選んでいる…）"
