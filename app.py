@@ -305,7 +305,15 @@ def group_chat():
 
         yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
 
-    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # nginx 系プロキシのバッファリングを切る
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @app.route("/reset", methods=["POST"])
