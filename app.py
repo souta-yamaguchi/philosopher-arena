@@ -133,6 +133,32 @@ PERSONAS = {k: v + LENGTH_RULE for k, v in _RAW_PERSONAS.items()}
 GROUP_PERSONAS = {k: GROUP_RULE + "\n\n" + v + GROUP_RULE for k, v in _RAW_PERSONAS.items()}
 
 
+def _sanitize_group_reply(text: str) -> str:
+    """円卓会議の応答から汚染（他哲学者の見出し・水平線・markdown）を除去。"""
+    import re
+    # 1) 先頭の markdown 見出し行（「# ソクラテス」等）を削除して本文に到達
+    text = re.sub(r"^\s*#{1,6}[^\n]*\n+", "", text)
+    # 2) 先頭・末尾の装飾ダッシュを削除
+    text = re.sub(r"^\s*[—\-–]+\s*", "", text)
+    # 3) 本文の途中に別哲学者の見出しが出たらそこ以降を切り捨て
+    for other_name in ("\n# ソクラテス", "\n# ニーチェ", "\n# カント", "\n# ウィトゲンシュタイン",
+                       "\n## ソクラテス", "\n## ニーチェ", "\n## カント", "\n## ウィトゲンシュタイン",
+                       "# ソクラテス", "# ニーチェ", "# カント", "# ウィトゲンシュタイン"):
+        idx = text.find(other_name)
+        if idx > 0:  # 先頭（0）は既に 1) で処理済み
+            text = text[:idx]
+    # 4) 水平線以降を切り捨て
+    for sep in ("\n---", "\n\n---"):
+        if sep in text:
+            text = text.split(sep)[0]
+    # 5) 残った行頭の markdown 見出しを除去
+    text = re.sub(r"^\s*#{1,6}[^\n]*\n?", "", text, flags=re.MULTILINE)
+    text = text.strip()
+    if not text or text in ("——", "—", "-"):
+        text = "（この賢者は今、言葉を選んでいる…）"
+    return text
+
+
 # ── Rate limiting ─────────────────────────────────────────────
 GLOBAL_DAILY_CAP = 100  # 全員合算 / 1日
 
@@ -305,26 +331,29 @@ def group_chat():
                     "cache_control": {"type": "ephemeral"},
                 }
             ]
+            # 返答の最初を「#」でないトークンに誘導するプレフィル
+            prefill = "——"
+            messages_with_prefill = history + [{"role": "assistant", "content": prefill}]
+
             full_text = ""
-            # 他哲学者の見出し・水平線を書こうとしたら即停止（API 上限 4 個以内）
             stop_sequences = ["\n#", "\n---", "\n\n#", "\n\n---"]
             with client.messages.stream(
                 model="claude-sonnet-4-5",
                 max_tokens=220,
                 system=system_blocks,
-                messages=history,
+                messages=messages_with_prefill,
                 stop_sequences=stop_sequences,
             ) as stream:
                 for text in stream.text_stream:
                     full_text += text
-                    yield f"data: {json.dumps({'philosopher': key, 'text': text}, ensure_ascii=False)}\n\n"
 
-            # 他哲学者の名前を書いてしまった場合は履歴に残さない（次回の模倣を防ぐ）
-            cleaned = full_text
-            for other_name in ("# ソクラテス", "# ニーチェ", "# カント", "# ウィトゲンシュタイン"):
-                if other_name in cleaned:
-                    cleaned = cleaned.split(other_name)[0].rstrip()
-            history.append({"role": "assistant", "content": cleaned or full_text})
+            # prefill を含めて最終テキストを組み立て → クリーン
+            raw = prefill + full_text
+            cleaned = _sanitize_group_reply(raw)
+            # 一括でクライアントへ（クライアント側で1文字ずつアニメする）
+            yield f"data: {json.dumps({'philosopher': key, 'text': cleaned}, ensure_ascii=False)}\n\n"
+
+            history.append({"role": "assistant", "content": cleaned})
 
         yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
 
