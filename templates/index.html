@@ -883,11 +883,10 @@ async function send() {
 async function sendGroup(message) {
   addMessage('user', '君', message, '').textContent = message;
 
-  // 文字キュー: 各要素は { ch, target } 形式。
-  // target に textEl を一緒に記憶するので、次の哲学者に切り替わっても
-  // 前の哲学者の残り文字が混ざらない
-  let currentTextEl = null;
-  let charQueue = [];
+  // 哲学者別に textEl を保持。text イベントに含まれる philosopher キー
+  // を使って必ず正しいバブルへルーティングする（順序競合を根絶）
+  const philosopherBubbles = {};  // key -> text element
+  let charQueue = [];              // { ch, target }
   let streamDone = false;
   const TYPE_INTERVAL_MS = 30;
 
@@ -941,12 +940,15 @@ async function sendGroup(message) {
         if (data.order) {
           // 順序通知のみ、UI 操作はなし
         } else if (data.start) {
-          // 新しい哲学者の発言開始 → 新バブルを作る
-          currentTextEl = addMessage('ai', PHILOSOPHERS[data.start].name, '', null, data.start);
-        } else if (data.text && currentTextEl) {
-          // その時点の textEl と一緒にキューに積む
-          const target = currentTextEl;
-          for (const ch of data.text) charQueue.push({ch, target});
+          // 新しい哲学者の発言開始 → バブルを作って key で記録
+          philosopherBubbles[data.start] =
+            addMessage('ai', PHILOSOPHERS[data.start].name, '', null, data.start);
+        } else if (data.text && data.philosopher) {
+          // text イベントの philosopher キーで正しいバブルを特定
+          const target = philosopherBubbles[data.philosopher];
+          if (target) {
+            for (const ch of data.text) charQueue.push({ch, target});
+          }
         } else if (data.done) {
           streamDone = true;
         }
