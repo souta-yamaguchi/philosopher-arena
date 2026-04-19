@@ -46,22 +46,25 @@
   header {
     background: linear-gradient(180deg, #2a251d 0%, #3b332a 100%);
     color: var(--marble);
-    padding: 20px 30px;
-    border-bottom: 3px double var(--gold);
+    padding: 8px 20px;
+    border-bottom: 2px solid var(--gold);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
+    height: 42px;
+    box-sizing: border-box;
   }
   header h1 {
     margin: 0;
-    font-size: 24px;
-    letter-spacing: 4px;
+    font-size: 18px;
+    letter-spacing: 3px;
     font-weight: normal;
   }
   header h1 .gk {
     color: var(--gold);
-    font-size: 18px;
-    margin-left: 12px;
+    font-size: 13px;
+    margin-left: 10px;
     letter-spacing: 2px;
   }
   header .subtitle {
@@ -73,7 +76,7 @@
   /* === PC: Teams 風の 2 カラムレイアウト === */
   .container {
     display: flex;
-    height: calc(100vh - 66px);   /* header 分を引く */
+    height: calc(100vh - 42px);   /* header 分を引く */
     gap: 0;
     overflow: hidden;
   }
@@ -93,8 +96,8 @@
     background: var(--parchment);
   }
   .main-panel > .chat { flex: 1; min-height: 0; border-radius: 0; border: none; background: #fdfaf0; }
-  .main-panel > .input-area { padding: 10px 18px 4px; }
-  .main-panel > .toolbar { padding: 2px 18px 10px; }
+  .main-panel > .input-area { padding: 6px 18px 2px; }
+  .main-panel > .toolbar { padding: 1px 18px 6px; font-size: 10px; }
 
   /* 哲学者セレクタ — サイドバー内で縦リスト */
   .selector {
@@ -355,21 +358,23 @@
   }
 
   .input-area {
-    margin-top: 14px;
+    margin-top: 0;
     display: flex;
-    gap: 10px;
+    gap: 8px;
   }
   .input-area textarea {
     flex: 1;
-    padding: 11px 14px;
-    border: 2px solid #c9bf9f;
+    padding: 7px 12px;
+    border: 1px solid #c9bf9f;
     border-radius: 4px;
     background: #fffcf2;
     font-family: inherit;
-    font-size: 15px;
+    font-size: 14px;
     color: var(--ink);
     resize: none;
-    min-height: 50px;
+    min-height: 36px;
+    height: 36px;
+    line-height: 1.5;
   }
   .input-area textarea:focus {
     outline: none;
@@ -377,14 +382,15 @@
     box-shadow: 0 0 0 3px rgba(167, 125, 60, 0.15);
   }
   .input-area button {
-    padding: 0 22px;
+    padding: 0 18px;
     background: linear-gradient(180deg, #a77d3c 0%, #8b5a2b 100%);
     color: #fcf6e4;
     border: none;
     border-radius: 4px;
     font-family: inherit;
-    font-size: 15px;
+    font-size: 13px;
     letter-spacing: 2px;
+    height: 36px;
     cursor: pointer;
     min-width: 96px;
   }
