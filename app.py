@@ -93,104 +93,11 @@ LENGTH_RULE = """
 """
 
 
-GROUP_RULE_TEMPLATE = """
-
----
-
-## 【円卓会議ルール】
-
-あなたは今、アリーナの円卓で {others} と共に討論している。
-ユーザが投げたテーマに対し、他の哲学者も順に発言する。
-
-### ❌ 絶対にやってはならぬこと
-- **他の哲学者の立場を代弁するな**（例：「## ソクラテス」「## カント」のような節を書くのは禁止）
-- **markdown 見出し（#, ##, ###）を一切使うな**
-- **複数人の見解を並べたドキュメントを書くな**（君は司会者ではない）
-- **水平線（---）で区切るな**
-- 長い前置き・自己紹介・テーマの言い換え
-
-### ✅ やるべきこと
-- **あなたは {self_name} である。他の誰でもない。{self_name} の声でのみ応答せよ**
-- 直前までの発言を必ず踏まえよ（前の発言に反論・同意・深掘りせよ）
-- 同意するなら短く頷き、反論するなら名前を呼んで鋭く切り返せ（例：「ソクラテスよ、君の問いは〜」）
-- 新しい視点・角度を一つ持ち込むこと
-- 3〜5 文、**一続きの散文**で打ち切れ
-- 既に出た論点の繰り返しは禁物
-"""
-
-
 def load_persona(name: str) -> str:
     return (BASE / "philosophers" / f"{name}.md").read_text(encoding="utf-8")
 
 
 PERSONAS = {k: load_persona(k) + LENGTH_RULE for k in PHILOSOPHERS}
-
-
-def build_group_messages(history: list, speaker_name: str) -> list:
-    """
-    group-chat 用: 履歴を 1 本の user メッセージへ畳み込む。
-    【name】 のような書式を避け、Claude が模倣しにくいナラティブ形式で伝える。
-    """
-    parts = ["【円卓会議のこれまで】"]
-    user_topic = None
-    prior = []  # (name, content)
-    for m in history:
-        if m["role"] == "user":
-            user_topic = m["content"]
-        else:
-            # content は "【name】text" の形
-            c = m["content"]
-            if c.startswith("【"):
-                end = c.find("】")
-                if end > 0:
-                    prior.append((c[1:end], c[end+1:]))
-                    continue
-            prior.append(("不明", c))
-
-    if user_topic:
-        parts.append(f"ユーザの問い：「{user_topic}」")
-    if prior:
-        parts.append("")
-        parts.append("これまでに発言した哲学者：")
-        for pname, pcontent in prior:
-            parts.append(f"◆ {pname} の発言：")
-            parts.append(pcontent)
-            parts.append("")
-
-    parts.append("────────────────────────")
-    parts.append(f"いま発言するのは、{speaker_name} である。")
-    parts.append("")
-    parts.append("【厳守事項】")
-    parts.append(f"・{speaker_name} 一人の声でのみ応答せよ。他の哲学者の発言を書き起こすな。")
-    parts.append("・「◆ 〇〇の発言」のようなラベルや、「【名前】」の表記を自分の応答に含めるな。")
-    parts.append("・markdown 見出し（#, ##, ###）、水平線、箇条書きは一切使うな。")
-    parts.append("・前置きや『尊敬すべき問い手よ』的な挨拶なしで、いきなり本題に入れ。")
-    parts.append("・3〜5 文、一続きの散文で。自分の名前を冒頭で宣言するな。")
-    return [{"role": "user", "content": "\n".join(parts)}]
-
-
-def group_stop_sequences(speaker_key: str) -> list:
-    """他哲学者の名前ラベルが出力に現れたら即停止するための stop sequences."""
-    seqs = []
-    for k, p in PHILOSOPHERS.items():
-        if k == speaker_key:
-            continue
-        n = p["name"]
-        seqs.append(f"【{n}】")
-        seqs.append(f"◆ {n}")
-        seqs.append(f"## {n}")
-    return seqs
-
-
-def group_system_prompt(speaker_key: str) -> str:
-    """円卓会議用の system prompt。speaker 以外の 3 名の名前を埋め込む。"""
-    self_name = PHILOSOPHERS[speaker_key]["name"]
-    others = "、".join(
-        PHILOSOPHERS[k]["name"] for k in PHILOSOPHERS if k != speaker_key
-    )
-    return PERSONAS[speaker_key] + GROUP_RULE_TEMPLATE.format(
-        self_name=self_name, others=others
-    )
 
 
 # ── Rate limiting ─────────────────────────────────────────────
@@ -311,7 +218,8 @@ def chat():
 @app.route("/group-chat", methods=["POST"])
 @login_required
 def group_chat():
-    """円卓会議：4哲学者がランダム順に、前の発言を踏まえて議論する"""
+    """円卓会議：4哲学者が独立にユーザの問いに答える。
+    各哲学者は自分の過去発言だけを見る（他の哲学者の発言は一切見ない）。"""
     ip = client_ip()
     # 4 人分の API 呼び出しなので、事前に 4 回分の空きがあるか確認
     with _lock:
@@ -320,7 +228,6 @@ def group_chat():
             return jsonify({
                 "error": "本日のサイト全体の上限に達しました。また明日お試しください。"
             }), 429
-        # 枠を 4 人分先に予約
         now = time.time()
         for _ in range(len(PHILOSOPHERS)):
             _global_day.append(now)
@@ -332,50 +239,46 @@ def group_chat():
         return jsonify({"error": "topic required"}), 400
 
     sess = conversations.setdefault(session_id, {})
-    history = sess.setdefault("_group", [])
-    history.append({"role": "user", "content": topic})
+    # _group は哲学者ごとに独立した履歴を持つ dict
+    group_histories = sess.setdefault("_group", {})
+    if not isinstance(group_histories, dict):
+        # 旧形式（list）だった場合はリセット
+        group_histories = {}
+        sess["_group"] = group_histories
 
-    # ランダム順に発言者を決める
+    # ランダム順に発言者を決める（UI の演出用、応答内容には影響しない）
     order = list(PHILOSOPHERS.keys())
     random.shuffle(order)
 
     def generate():
-        # 1) 発言順をクライアントに通知
         yield f"data: {json.dumps({'order': order}, ensure_ascii=False)}\n\n"
 
-        # 2) 各哲学者が順に発言
         for key in order:
-            name = PHILOSOPHERS[key]["name"]
-            # 発言者切り替え通知
+            # 各哲学者の独立履歴にユーザ発言を追記
+            history = group_histories.setdefault(key, [])
+            history.append({"role": "user", "content": topic})
+
             yield f"data: {json.dumps({'start': key}, ensure_ascii=False)}\n\n"
 
             system_blocks = [
                 {
                     "type": "text",
-                    "text": group_system_prompt(key),
+                    "text": PERSONAS[key],
                     "cache_control": {"type": "ephemeral"},
                 }
             ]
-            # 履歴を単一 user メッセージへ畳み込む → assistant 連続問題を回避
-            api_messages = build_group_messages(history, name)
-            stop_seqs = group_stop_sequences(key)
             full_text = ""
             with client.messages.stream(
                 model="claude-sonnet-4-5",
-                max_tokens=700,
+                max_tokens=1000,
                 system=system_blocks,
-                messages=api_messages,
-                stop_sequences=stop_seqs,
+                messages=history,
             ) as stream:
                 for text in stream.text_stream:
                     full_text += text
                     yield f"data: {json.dumps({'philosopher': key, 'text': text}, ensure_ascii=False)}\n\n"
 
-            # 履歴に話者名プレフィックス付きで追記 → 次の哲学者が参照できる
-            history.append({
-                "role": "assistant",
-                "content": f"【{name}】{full_text}",
-            })
+            history.append({"role": "assistant", "content": full_text})
 
         yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
 
@@ -384,7 +287,7 @@ def group_chat():
         mimetype="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # nginx 系プロキシのバッファリングを切る
+            "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
         },
     )
@@ -397,7 +300,10 @@ def reset():
     session_id = data.get("session_id", "default")
     philosopher = data.get("philosopher")
     sess = conversations.setdefault(session_id, {})
-    if philosopher:
+    if philosopher == "_group":
+        # グループは哲学者ごとに独立した履歴の dict
+        sess["_group"] = {}
+    elif philosopher:
         sess[philosopher] = []
     else:
         conversations[session_id] = {}
