@@ -70,48 +70,69 @@
     font-style: italic;
   }
 
+  /* === PC: Teams 風の 2 カラムレイアウト === */
   .container {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 20px;
+    display: flex;
+    height: calc(100vh - 66px);   /* header 分を引く */
+    gap: 0;
+    overflow: hidden;
   }
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: #f9f4e2;
+    border-right: 1px solid #d8cfb3;
+    overflow-y: auto;
+    padding: 10px 8px;
+  }
+  .main-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--parchment);
+  }
+  .main-panel > .chat { flex: 1; min-height: 0; border-radius: 0; border: none; background: #fdfaf0; }
+  .main-panel > .input-area { padding: 10px 18px 4px; }
+  .main-panel > .toolbar { padding: 2px 18px 10px; }
 
-  /* 哲学者セレクタ */
+  /* 哲学者セレクタ — サイドバー内で縦リスト */
   .selector {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 10px;
-    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
   .selector .card {
-    background: #fdfaf0;
-    border: 2px solid #d8cfb3;
-    border-radius: 4px;
-    padding: 14px 10px;
-    text-align: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 8px 10px;
+    text-align: left;
     cursor: pointer;
-    transition: all 0.18s;
+    transition: all 0.15s;
     user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
   .selector .card:hover {
-    border-color: var(--gold);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    background: rgba(167, 125, 60, 0.08);
   }
   .selector .card.active {
     background: var(--marble);
     border-color: var(--gold);
-    box-shadow: inset 0 0 0 1px var(--gold), 0 2px 6px rgba(0,0,0,0.12);
+    box-shadow: inset 0 0 0 1px var(--gold);
   }
   .selector .icon {
-    width: 56px;
-    height: 56px;
-    margin: 0 auto 6px;
+    width: 40px;
+    height: 40px;
+    margin: 0;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid #c9bf9f;
     display: block;
     filter: sepia(0.15);
+    flex-shrink: 0;
   }
   .card.active .icon {
     border-color: var(--gold);
@@ -123,9 +144,9 @@
 
   /* Group selector card: 2x2 portrait grid */
   .selector .icon-group {
-    width: 56px;
-    height: 56px;
-    margin: 0 auto 6px;
+    width: 40px;
+    height: 40px;
+    margin: 0;
     border-radius: 50%;
     border: 2px solid #c9bf9f;
     display: grid;
@@ -133,6 +154,7 @@
     grid-template-rows: 1fr 1fr;
     overflow: hidden;
     background: #3b332a;
+    flex-shrink: 0;
   }
   .card[data-id="group"].active .icon-group { border-color: var(--gold); }
   .selector .icon-group img {
@@ -150,21 +172,33 @@
     flex-shrink: 0;
   }
   .philosopher-card.group .bust-group img {
-    width: 48px;
-    height: 48px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid var(--gold);
   }
+  .selector .card-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+  }
   .selector .pname {
     font-size: 14px;
-    letter-spacing: 1.5px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .selector .pyears {
     font-size: 10px;
     color: #8b8368;
     font-style: italic;
-    margin-top: 2px;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* 色別アクセント */
@@ -173,29 +207,31 @@
   .card[data-color="navy"].active { background: #dde5f0; border-color: var(--navy); box-shadow: inset 0 0 0 1px var(--navy), 0 2px 6px rgba(0,0,0,0.12); }
   .card[data-color="slate"].active { background: #e2e5eb; border-color: var(--slate); box-shadow: inset 0 0 0 1px var(--slate), 0 2px 6px rgba(0,0,0,0.12); }
 
-  /* 哲学者カード（現在選択中） */
+  /* チャット上部のヘッダー（現在の話者） */
   .philosopher-card {
     background: var(--marble);
-    border: 2px solid var(--gold);
-    border-radius: 4px;
-    padding: 16px 22px;
-    margin-bottom: 18px;
+    border: none;
+    border-bottom: 1px solid #d8cfb3;
+    border-radius: 0;
+    padding: 10px 20px;
+    margin-bottom: 0;
     display: flex;
-    gap: 18px;
+    gap: 14px;
     align-items: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    transition: border-color 0.3s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    flex-shrink: 0;
   }
-  .philosopher-card.crimson { border-color: var(--crimson); background: #f5e4e4; }
-  .philosopher-card.navy    { border-color: var(--navy); background: #dde5f0; }
-  .philosopher-card.slate   { border-color: var(--slate); background: #e2e5eb; }
+  .philosopher-card.crimson { background: #f5e4e4; }
+  .philosopher-card.navy    { background: #dde5f0; }
+  .philosopher-card.slate   { background: #e2e5eb; }
+  .philosopher-card.group   { background: var(--marble); }
 
   .philosopher-card .bust {
-    width: 80px;
-    height: 80px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid var(--bronze);
+    border: 2px solid var(--bronze);
     flex-shrink: 0;
   }
   .philosopher-card.crimson .bust { border-color: var(--crimson); }
@@ -203,24 +239,24 @@
   .philosopher-card.slate .bust   { border-color: var(--slate); }
 
   .philosopher-card .info h2 {
-    margin: 0 0 2px;
-    font-size: 20px;
-    letter-spacing: 2px;
+    margin: 0 0 1px;
+    font-size: 17px;
+    letter-spacing: 1.5px;
   }
   .philosopher-card .info .gk {
     color: #8b8368;
-    font-size: 12px;
+    font-size: 11px;
     margin-left: 6px;
   }
   .philosopher-card .info p {
     margin: 0;
     color: #5b5444;
-    font-size: 12px;
+    font-size: 11px;
     font-style: italic;
   }
   .philosopher-card .info .quote {
-    margin-top: 6px;
-    font-size: 12px;
+    margin-top: 2px;
+    font-size: 11px;
     color: var(--bronze);
     font-style: italic;
   }
@@ -232,10 +268,8 @@
     background: #fdfaf0;
     border: 1px solid #d8cfb3;
     border-radius: 4px;
-    min-height: 380px;
-    max-height: 56vh;
     overflow-y: auto;
-    padding: 18px;
+    padding: 18px 24px;
     box-shadow: inset 0 1px 4px rgba(0,0,0,0.05);
   }
 
@@ -388,11 +422,10 @@
   }
 
   footer {
-    text-align: center;
-    color: #a79e82;
-    font-size: 11px;
-    padding: 20px;
-    font-style: italic;
+    display: none;   /* 2 カラムレイアウトでは不要 */
+  }
+  body {
+    overflow: hidden;  /* PC は container 内でのみスクロール */
   }
 
   /* Welcome modal */
@@ -497,38 +530,67 @@
       font-size: 12px !important;
     }
 
+    body { overflow: auto; }
+
     .container {
       padding: 10px;
       flex: 1;
       display: flex;
       flex-direction: column;
-      min-height: 0;  /* important for flex */
+      height: auto;
+      min-height: 0;
+      overflow: visible;
     }
 
-    /* セレクタは横並び 4列のまま、コンパクトに */
+    /* モバイルは上段に横並びセレクタ、下段にメインパネル */
+    .sidebar {
+      width: 100%;
+      flex-shrink: 0;
+      border-right: none;
+      border-bottom: 1px solid #d8cfb3;
+      padding: 6px;
+      background: transparent;
+      max-height: none;
+      overflow: visible;
+    }
+    .main-panel {
+      min-height: 0;
+    }
+
+    /* セレクタは横並び 5 列のグリッドに戻す */
     .selector {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
       gap: 6px;
-      margin-bottom: 10px;
+      flex-direction: unset;
     }
     .selector .card {
       padding: 8px 4px;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 3px;
     }
     .selector .icon,
     .selector .icon-group {
       width: 44px;
       height: 44px;
-      margin-bottom: 4px;
+      margin: 0;
     }
-    .philosopher-card.group .bust-group img {
-      width: 36px;
-      height: 36px;
+    .selector .card-info {
+      align-items: center;
+      overflow: visible;
     }
     .selector .pname {
       font-size: 12px;
       letter-spacing: 1px;
     }
     .selector .pyears {
-      display: none;  /* スマホでは年代非表示 */
+      display: none;
+    }
+    .philosopher-card.group .bust-group img {
+      width: 36px;
+      height: 36px;
     }
 
     /* 哲学者カードはコンパクトに */
@@ -672,55 +734,63 @@
 
 <div class="container">
 
-  <div class="selector" id="selector">
-    {% for key, p in philosophers.items() %}
-    <div class="card" data-id="{{ key }}" data-color="{{ p.color }}" onclick="selectPhilosopher('{{ key }}')">
-      <img class="icon" src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" data-fallback="{{ p.avatar }}" loading="lazy">
-      <div class="pname">{{ p.name }}</div>
-      <div class="pyears">{{ p.years.split('/')[0].strip() }}</div>
+  <aside class="sidebar">
+    <div class="selector" id="selector">
+      {% for key, p in philosophers.items() %}
+      <div class="card" data-id="{{ key }}" data-color="{{ p.color }}" onclick="selectPhilosopher('{{ key }}')">
+        <img class="icon" src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" data-fallback="{{ p.avatar }}" loading="lazy">
+        <div class="card-info">
+          <div class="pname">{{ p.name }}</div>
+          <div class="pyears">{{ p.years.split('/')[0].strip() }}</div>
+        </div>
+      </div>
+      {% endfor %}
+      <div class="card" data-id="group" data-color="gold" onclick="selectPhilosopher('group')">
+        <div class="icon-group">
+          {% for key, p in philosophers.items() %}
+          <img src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" loading="lazy">
+          {% endfor %}
+        </div>
+        <div class="card-info">
+          <div class="pname">全員</div>
+          <div class="pyears">円卓会議</div>
+        </div>
+      </div>
     </div>
-    {% endfor %}
-    <div class="card" data-id="group" data-color="gold" onclick="selectPhilosopher('group')">
-      <div class="icon-group">
+  </aside>
+
+  <main class="main-panel">
+    <div id="philosopher-card" class="philosopher-card">
+      <img class="bust" id="bust" src="/static/philosophers/socrates.jpg" alt="">
+      <div class="bust-group" id="bustGroup" style="display:none">
         {% for key, p in philosophers.items() %}
         <img src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" loading="lazy">
         {% endfor %}
       </div>
-      <div class="pname">全員</div>
-      <div class="pyears">円卓会議</div>
+      <div class="info">
+        <h2 id="pname">ソクラテス<span class="gk" id="pgreek">Σωκράτης</span></h2>
+        <p id="pyears">紀元前470年頃 – 紀元前399年 / アテナイ</p>
+        <div class="quote" id="pquote">"吟味されざる生は、生きるに値しない"</div>
+      </div>
     </div>
-  </div>
 
-  <div id="philosopher-card" class="philosopher-card">
-    <img class="bust" id="bust" src="/static/philosophers/socrates.jpg" alt="">
-    <div class="bust-group" id="bustGroup" style="display:none">
-      {% for key, p in philosophers.items() %}
-      <img src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" loading="lazy">
-      {% endfor %}
+    <div id="chat" class="chat">
+      <div class="initial-prompt">
+        問いを投げよ。<br>
+        賢者は君の問いと向き合うだろう。
+      </div>
     </div>
-    <div class="info">
-      <h2 id="pname">ソクラテス<span class="gk" id="pgreek">Σωκράτης</span></h2>
-      <p id="pyears">紀元前470年頃 – 紀元前399年 / アテナイ</p>
-      <div class="quote" id="pquote">"吟味されざる生は、生きるに値しない"</div>
-    </div>
-  </div>
 
-  <div id="chat" class="chat">
-    <div class="initial-prompt">
-      問いを投げよ。<br>
-      賢者は君の問いと向き合うだろう。
+    <div class="input-area">
+      <textarea id="input" placeholder="問いを投げよ…"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send();}"></textarea>
+      <button id="sendBtn" onclick="send()">問う</button>
     </div>
-  </div>
-
-  <div class="input-area">
-    <textarea id="input" placeholder="問いを投げよ…"
-      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send();}"></textarea>
-    <button id="sendBtn" onclick="send()">問う</button>
-  </div>
-  <div class="toolbar">
-    <span>Enter で送信 / Shift+Enter で改行 / 哲学者を切り替えると対話履歴も切り替わる</span>
-    <button onclick="resetChat()">この賢者との対話をリセット</button>
-  </div>
+    <div class="toolbar">
+      <span>Enter で送信 / Shift+Enter で改行</span>
+      <button onclick="resetChat()">この賢者との対話をリセット</button>
+    </div>
+  </main>
 </div>
 
 <footer>
