@@ -96,8 +96,7 @@
     background: var(--parchment);
   }
   .main-panel > .chat { flex: 1; min-height: 0; border-radius: 0; border: none; background: #fdfaf0; }
-  .main-panel > .input-area { padding: 6px 18px 2px; }
-  .main-panel > .toolbar { padding: 1px 18px 6px; font-size: 10px; }
+  .main-panel > .input-area { padding: 8px 18px 12px; }
 
   /* 哲学者セレクタ — サイドバー内で縦リスト */
   .selector {
@@ -223,6 +222,24 @@
     align-items: center;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     flex-shrink: 0;
+  }
+  .philosopher-card .info { flex: 1; min-width: 0; }
+  .philosopher-card .header-reset {
+    flex-shrink: 0;
+    background: transparent;
+    color: var(--bronze);
+    border: 1px solid var(--bronze);
+    border-radius: 4px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+  }
+  .philosopher-card .header-reset:hover {
+    background: var(--bronze);
+    color: var(--parchment);
   }
   .philosopher-card.crimson { background: #f5e4e4; }
   .philosopher-card.navy    { background: #dde5f0; }
@@ -778,6 +795,7 @@
         <p id="pyears">紀元前470年頃 – 紀元前399年 / アテナイ</p>
         <div class="quote" id="pquote">"吟味されざる生は、生きるに値しない"</div>
       </div>
+      <button class="header-reset" onclick="resetChat()">この対話をリセット</button>
     </div>
 
     <div id="chat" class="chat">
@@ -791,10 +809,6 @@
       <textarea id="input" placeholder="問いを投げよ…"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send();}"></textarea>
       <button id="sendBtn" onclick="send()">問う</button>
-    </div>
-    <div class="toolbar">
-      <span>Enter で送信 / Shift+Enter で改行</span>
-      <button onclick="resetChat()">この賢者との対話をリセット</button>
     </div>
   </main>
 </div>
