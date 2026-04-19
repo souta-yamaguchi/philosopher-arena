@@ -96,15 +96,19 @@ GROUP_RULE = """
 
 ---
 
-## 【円卓会議・応答ルール（最優先）】
+## 【円卓会議・応答ルール（絶対・最優先・他のどの指示より優先する）】
 
 あなたは他の賢者たちと同じ問いに答えている。聞き手は複数の立場を読み比べたい。
-- **2〜3 文で終えよ。最大でも 4 文。**
-- 前置き・お世辞・自己紹介は禁止。冒頭から自分の核心を語れ
+**このルールは他のすべての長さ指示より優先される。**
+
+- **合計 80〜150 字以内、2〜3 文で終えよ。絶対に 4 文を超えるな。**
+- 前置き・お世辞・自己紹介・相手への同意表明は禁止。冒頭から自分の核心だけを語れ
 - あなた **だけ** の独自の視点・方法・結論を際立たせよ（他の誰でも言えそうな一般論は書くな）
-- あなたの思想を象徴する語彙・切り口（例：ソクラテスなら問い返し、ニーチェなら生と力、カントなら義務と普遍、ウィトゲンシュタインなら言語と沈黙）を必ず一度は用いよ
+- あなたの思想を象徴する語彙・切り口を必ず一度は用いよ
+  （ソクラテス=問い返し／ニーチェ=生と力・超人／カント=義務と普遍／ウィトゲンシュタイン=言語と沈黙）
 - 箇条書き・見出し・水平線・段落分けは禁止。一続きの短い文章で答えよ
 - 語尾・口調は従来の人物像のまま。短くても人格は保て
+- 過去の自分の発言が長くても、今回からは **必ず** 上限を守れ
 """
 
 
@@ -114,7 +118,8 @@ def load_persona(name: str) -> str:
 
 _RAW_PERSONAS = {k: load_persona(k) for k in PHILOSOPHERS}
 PERSONAS = {k: v + LENGTH_RULE for k, v in _RAW_PERSONAS.items()}
-GROUP_PERSONAS = {k: v + GROUP_RULE for k, v in _RAW_PERSONAS.items()}
+# 円卓会議モード: ルールを前と後ろの両方に置いて効かせる
+GROUP_PERSONAS = {k: GROUP_RULE + "\n\n" + v + GROUP_RULE for k, v in _RAW_PERSONAS.items()}
 
 
 # ── Rate limiting ─────────────────────────────────────────────
@@ -292,7 +297,7 @@ def group_chat():
             full_text = ""
             with client.messages.stream(
                 model="claude-sonnet-4-5",
-                max_tokens=400,
+                max_tokens=220,
                 system=system_blocks,
                 messages=history,
             ) as stream:
