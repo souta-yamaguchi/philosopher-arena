@@ -100,15 +100,23 @@ GROUP_RULE = """
 
 ### あなたは【あなた自身ひとりだけ】として短く答える。
 
-**他の賢者（ソクラテス・ニーチェ・カント・ウィトゲンシュタインのうち、あなた以外の誰か）の代弁をしてはならない。**
-**他の賢者の名前を出力に書いてはならない。**（例：「# ソクラテス」「ソクラテスならこう言うだろう」等、一切禁止）
+**他の賢者（ソクラテス・ニーチェ・カント・ウィトゲンシュタインのうち、あなた以外の誰か）の代弁・なりきりを絶対にしてはならない。**
+**他の賢者の名前を自分の発言の中で使ってはならない。**
 **複数の立場を並列して書いてはならない。** あなたはあなた自身としての返答だけを出力する。
+
+### 絶対にやってはならない例（重要）
+- NG: あなたがカントなのに「私はソクラテス。アテナイの石工の子だ」と名乗る
+- NG: 「各々自己を明らかにせよ」「では君から」と司会進行する
+- NG: 「# ソクラテス」等の見出しで別人物の発言を書く
+- NG: 「ソクラテスならこう言うだろう、ニーチェなら…」と他人の意見を要約する
+- **OK: 自分自身としてだけ、短く、自分の思想の核心を述べる**
 
 ### 形式の絶対禁止事項
 - `#` `##` `###` などの markdown 見出しを **絶対に書くな**
 - 水平線 `---` で区切るな
 - 段落を複数に分けるな（1 パラグラフで収めよ）
 - 箇条書き・番号列挙を使うな
+- 司会進行の台詞（「歓迎する」「各々名乗れ」等）は禁止
 
 ### 長さの絶対上限
 - **合計 80〜150 字、2〜3 文で終えよ。どれだけ語りたくても 4 文を超えるな。**
@@ -122,6 +130,15 @@ GROUP_RULE = """
 - 過去の自分の発言が長くても、今回からは **必ず** 上限を守れ
 """
 
+# なりきり検出パターン（他哲学者になり切る典型的な表現）
+_IMPERSONATION_PATTERNS = {
+    "socrates":     [r"私はソクラテス", r"我はソクラテス", r"わたくしはソクラテス", r"吾はソクラテス"],
+    "nietzsche":    [r"私はニーチェ", r"我はニーチェ", r"わたくしはニーチェ", r"吾はニーチェ"],
+    "kant":         [r"私はカント", r"我はカント", r"わたくしはカント", r"吾はカント"],
+    "wittgenstein": [r"私はウィトゲンシュタイン", r"我はウィトゲンシュタイン",
+                     r"わたくしはウィトゲンシュタイン", r"吾はウィトゲンシュタイン"],
+}
+
 
 def load_persona(name: str) -> str:
     return (BASE / "philosophers" / f"{name}.md").read_text(encoding="utf-8")
@@ -133,8 +150,8 @@ PERSONAS = {k: v + LENGTH_RULE for k, v in _RAW_PERSONAS.items()}
 GROUP_PERSONAS = {k: GROUP_RULE + "\n\n" + v + GROUP_RULE for k, v in _RAW_PERSONAS.items()}
 
 
-def _sanitize_group_reply(text: str) -> str:
-    """円卓会議の応答から汚染（他哲学者の見出し・水平線・markdown）を除去。"""
+def _sanitize_group_reply(text: str, speaker_key: str = "") -> str:
+    """円卓会議の応答から汚染（他哲学者の見出し・なりきり・markdown）を除去。"""
     import re
     # 1) 先頭の markdown 見出し行（「# ソクラテス」等）を削除して本文に到達
     text = re.sub(r"^\s*#{1,6}[^\n]*\n+", "", text)
@@ -145,17 +162,26 @@ def _sanitize_group_reply(text: str) -> str:
                        "\n## ソクラテス", "\n## ニーチェ", "\n## カント", "\n## ウィトゲンシュタイン",
                        "# ソクラテス", "# ニーチェ", "# カント", "# ウィトゲンシュタイン"):
         idx = text.find(other_name)
-        if idx > 0:  # 先頭（0）は既に 1) で処理済み
+        if idx > 0:
             text = text[:idx]
-    # 4) 水平線以降を切り捨て
+    # 4) 他哲学者への「なりきり」（私はソクラテス 等）を検出して切り捨て
+    if speaker_key:
+        for other_key, patterns in _IMPERSONATION_PATTERNS.items():
+            if other_key == speaker_key:
+                continue
+            for pat in patterns:
+                m = re.search(pat, text)
+                if m:
+                    text = text[:m.start()]
+    # 5) 水平線以降を切り捨て
     for sep in ("\n---", "\n\n---"):
         if sep in text:
             text = text.split(sep)[0]
-    # 5) 残った行頭の markdown 見出しを除去
+    # 6) 残った行頭の markdown 見出しを除去
     text = re.sub(r"^\s*#{1,6}[^\n]*\n?", "", text, flags=re.MULTILINE)
-    # 6) 改行を全て単一スペースに畳む（1 パラグラフで表示）
+    # 7) 改行を全て単一スペースに畳む（1 パラグラフで表示）
     text = re.sub(r"\s*\n+\s*", " ", text)
-    # 7) 連続スペースを 1 つに
+    # 8) 連続スペースを 1 つに
     text = re.sub(r"[ \t]{2,}", " ", text)
     text = text.strip()
     if not text or text in ("——", "—", "-"):
@@ -353,7 +379,7 @@ def group_chat():
 
             # prefill を含めて最終テキストを組み立て → クリーン
             raw = prefill + full_text
-            cleaned = _sanitize_group_reply(raw)
+            cleaned = _sanitize_group_reply(raw, speaker_key=key)
             # 一括でクライアントへ（クライアント側で1文字ずつアニメする）
             yield f"data: {json.dumps({'philosopher': key, 'text': cleaned}, ensure_ascii=False)}\n\n"
 
