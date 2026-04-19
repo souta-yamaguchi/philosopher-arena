@@ -129,20 +129,57 @@ PERSONAS = {k: load_persona(k) + LENGTH_RULE for k in PHILOSOPHERS}
 def build_group_messages(history: list, speaker_name: str) -> list:
     """
     group-chat 用: 履歴を 1 本の user メッセージへ畳み込む。
-    assistant 連続によって Claude が「多観点統合文書」を書いてしまう問題を回避する。
+    【name】 のような書式を避け、Claude が模倣しにくいナラティブ形式で伝える。
     """
-    parts = ["以下は円卓会議でこれまで交わされた記録である。"]
+    parts = ["【円卓会議のこれまで】"]
+    user_topic = None
+    prior = []  # (name, content)
     for m in history:
         if m["role"] == "user":
-            parts.append(f"▼ ユーザの問い：{m['content']}")
+            user_topic = m["content"]
         else:
-            parts.append(f"▼ {m['content']}")  # 既に【name】が付いている
+            # content は "【name】text" の形
+            c = m["content"]
+            if c.startswith("【"):
+                end = c.find("】")
+                if end > 0:
+                    prior.append((c[1:end], c[end+1:]))
+                    continue
+            prior.append(("不明", c))
+
+    if user_topic:
+        parts.append(f"ユーザの問い：「{user_topic}」")
+    if prior:
+        parts.append("")
+        parts.append("これまでに発言した哲学者：")
+        for pname, pcontent in prior:
+            parts.append(f"◆ {pname} の発言：")
+            parts.append(pcontent)
+            parts.append("")
+
+    parts.append("────────────────────────")
+    parts.append(f"いま発言するのは、{speaker_name} である。")
     parts.append("")
-    parts.append(f"あなたは {speaker_name} である。他の誰でもない。")
-    parts.append(f"上記を踏まえ、{speaker_name} 一人の声だけで応答せよ。")
-    parts.append("他の哲学者の発言を代弁するな。markdown 見出し（#, ##, ###）も禁止。")
-    parts.append("前置きなしで、いきなり本題に入れ。3〜5 文、一続きの散文で。")
+    parts.append("【厳守事項】")
+    parts.append(f"・{speaker_name} 一人の声でのみ応答せよ。他の哲学者の発言を書き起こすな。")
+    parts.append("・「◆ 〇〇の発言」のようなラベルや、「【名前】」の表記を自分の応答に含めるな。")
+    parts.append("・markdown 見出し（#, ##, ###）、水平線、箇条書きは一切使うな。")
+    parts.append("・前置きや『尊敬すべき問い手よ』的な挨拶なしで、いきなり本題に入れ。")
+    parts.append("・3〜5 文、一続きの散文で。自分の名前を冒頭で宣言するな。")
     return [{"role": "user", "content": "\n".join(parts)}]
+
+
+def group_stop_sequences(speaker_key: str) -> list:
+    """他哲学者の名前ラベルが出力に現れたら即停止するための stop sequences."""
+    seqs = []
+    for k, p in PHILOSOPHERS.items():
+        if k == speaker_key:
+            continue
+        n = p["name"]
+        seqs.append(f"【{n}】")
+        seqs.append(f"◆ {n}")
+        seqs.append(f"## {n}")
+    return seqs
 
 
 def group_system_prompt(speaker_key: str) -> str:
@@ -321,12 +358,14 @@ def group_chat():
             ]
             # 履歴を単一 user メッセージへ畳み込む → assistant 連続問題を回避
             api_messages = build_group_messages(history, name)
+            stop_seqs = group_stop_sequences(key)
             full_text = ""
             with client.messages.stream(
                 model="claude-sonnet-4-5",
                 max_tokens=700,
                 system=system_blocks,
                 messages=api_messages,
+                stop_sequences=stop_seqs,
             ) as stream:
                 for text in stream.text_stream:
                     full_text += text
