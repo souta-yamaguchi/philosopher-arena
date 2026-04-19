@@ -218,25 +218,30 @@ def chat():
 @app.route("/group-chat", methods=["POST"])
 @login_required
 def group_chat():
-    """円卓会議：4哲学者が独立にユーザの問いに答える。
+    """円卓会議：選択された哲学者が独立にユーザの問いに答える。
     各哲学者は自分の過去発言だけを見る（他の哲学者の発言は一切見ない）。"""
-    ip = client_ip()
-    # 4 人分の API 呼び出しなので、事前に 4 回分の空きがあるか確認
-    with _lock:
-        _prune(_global_day, 86400)
-        if len(_global_day) + len(PHILOSOPHERS) > GLOBAL_DAILY_CAP:
-            return jsonify({
-                "error": "本日のサイト全体の上限に達しました。また明日お試しください。"
-            }), 429
-        now = time.time()
-        for _ in range(len(PHILOSOPHERS)):
-            _global_day.append(now)
-
     data = request.get_json()
     session_id = data.get("session_id", "default")
     topic = data.get("message", "").strip()
     if not topic:
         return jsonify({"error": "topic required"}), 400
+
+    # members フィールドで参加者を指定（未指定なら全員）
+    raw_members = data.get("members") or list(PHILOSOPHERS.keys())
+    members = [m for m in raw_members if m in PHILOSOPHERS]
+    if not members:
+        return jsonify({"error": "参加する賢者を1人以上選んでください"}), 400
+
+    # レート制限: 選択人数分を予約
+    with _lock:
+        _prune(_global_day, 86400)
+        if len(_global_day) + len(members) > GLOBAL_DAILY_CAP:
+            return jsonify({
+                "error": "本日のサイト全体の上限に達しました。また明日お試しください。"
+            }), 429
+        now = time.time()
+        for _ in range(len(members)):
+            _global_day.append(now)
 
     sess = conversations.setdefault(session_id, {})
     # _group は哲学者ごとに独立した履歴を持つ dict
@@ -246,8 +251,8 @@ def group_chat():
         group_histories = {}
         sess["_group"] = group_histories
 
-    # ランダム順に発言者を決める（UI の演出用、応答内容には影響しない）
-    order = list(PHILOSOPHERS.keys())
+    # ランダム順に発言者を決める（選択された members だけから）
+    order = list(members)
     random.shuffle(order)
 
     def generate():

@@ -241,6 +241,93 @@
     background: var(--bronze);
     color: var(--parchment);
   }
+
+  /* メンバー選択 UI（円卓会議選択時） */
+  .member-picker {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .picker-title {
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1.5px;
+    color: var(--navy);
+  }
+  .picker-title .picker-sub {
+    font-weight: normal;
+    font-size: 11px;
+    color: var(--bronze);
+    font-style: italic;
+    margin-left: 6px;
+    letter-spacing: 1px;
+  }
+  .picker-list {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .member-chip {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 3px;
+    border: 2px solid #c9bf9f;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .member-chip img {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    filter: grayscale(0.9) opacity(0.5);
+    transition: filter 0.15s;
+  }
+  .member-chip .chip-check {
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ccc;
+    color: white;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    font-weight: bold;
+    transition: all 0.15s;
+  }
+  .member-chip .chip-name {
+    font-size: 12px;
+    color: #8b8368;
+    letter-spacing: 0.5px;
+  }
+  .member-chip.selected {
+    border-color: var(--gold);
+    background: rgba(167, 125, 60, 0.08);
+  }
+  .member-chip.selected img { filter: none; }
+  .member-chip.selected .chip-check {
+    background: var(--gold);
+  }
+  .member-chip.selected .chip-name {
+    color: var(--ink);
+    font-weight: bold;
+  }
+  .member-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
   .philosopher-card.crimson { background: #f5e4e4; }
   .philosopher-card.navy    { background: #dde5f0; }
   .philosopher-card.slate   { background: #e2e5eb; }
@@ -759,6 +846,17 @@
 
   <aside class="sidebar">
     <div class="selector" id="selector">
+      <div class="card" data-id="group" data-color="gold" onclick="selectPhilosopher('group')">
+        <div class="icon-group">
+          {% for key, p in philosophers.items() %}
+          <img src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" loading="lazy">
+          {% endfor %}
+        </div>
+        <div class="card-info">
+          <div class="pname">円卓会議</div>
+          <div class="pyears">賢者たちと同時対話</div>
+        </div>
+      </div>
       {% for key, p in philosophers.items() %}
       <div class="card" data-id="{{ key }}" data-color="{{ p.color }}" onclick="selectPhilosopher('{{ key }}')">
         <img class="icon" src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" data-fallback="{{ p.avatar }}" loading="lazy">
@@ -768,32 +866,28 @@
         </div>
       </div>
       {% endfor %}
-      <div class="card" data-id="group" data-color="gold" onclick="selectPhilosopher('group')">
-        <div class="icon-group">
-          {% for key, p in philosophers.items() %}
-          <img src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" loading="lazy">
-          {% endfor %}
-        </div>
-        <div class="card-info">
-          <div class="pname">全員</div>
-          <div class="pyears">円卓会議</div>
-        </div>
-      </div>
     </div>
   </aside>
 
   <main class="main-panel">
     <div id="philosopher-card" class="philosopher-card">
       <img class="bust" id="bust" src="/static/philosophers/socrates.jpg" alt="">
-      <div class="bust-group" id="bustGroup" style="display:none">
-        {% for key, p in philosophers.items() %}
-        <img src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" loading="lazy">
-        {% endfor %}
-      </div>
-      <div class="info">
+      <div class="info" id="info">
         <h2 id="pname">ソクラテス<span class="gk" id="pgreek">Σωκράτης</span></h2>
         <p id="pyears">紀元前470年頃 – 紀元前399年 / アテナイ</p>
         <div class="quote" id="pquote">"吟味されざる生は、生きるに値しない"</div>
+      </div>
+      <div class="member-picker" id="memberPicker" style="display:none">
+        <div class="picker-title">円卓会議 <span class="picker-sub">— 参加する賢者を選べ —</span></div>
+        <div class="picker-list">
+          {% for key, p in philosophers.items() %}
+          <button class="member-chip selected" data-key="{{ key }}" onclick="toggleMember('{{ key }}')" title="{{ p.name }}">
+            <img src="/static/philosophers/{{ p.portrait }}" alt="{{ p.name }}" loading="lazy">
+            <span class="chip-check">✓</span>
+            <span class="chip-name">{{ p.name }}</span>
+          </button>
+          {% endfor %}
+        </div>
       </div>
       <button class="header-reset" onclick="resetChat()">この対話をリセット</button>
     </div>
@@ -826,6 +920,25 @@ const sendBtn = document.getElementById('sendBtn');
 let current = 'socrates';
 let chatsByPhilosopher = {};  // 哲学者別のDOM履歴保持
 
+// 円卓会議の参加メンバー選択状態（デフォルト: 全員）
+const selectedMembers = new Set(Object.keys(PHILOSOPHERS));
+
+function toggleMember(key) {
+  if (selectedMembers.has(key)) {
+    if (selectedMembers.size <= 1) return;  // 最低 1 人
+    selectedMembers.delete(key);
+  } else {
+    selectedMembers.add(key);
+  }
+  updateMemberChips();
+}
+
+function updateMemberChips() {
+  document.querySelectorAll('.member-chip').forEach(el => {
+    el.classList.toggle('selected', selectedMembers.has(el.dataset.key));
+  });
+}
+
 function selectPhilosopher(key) {
   if (key === current) return;
   // Save current chat DOM
@@ -838,23 +951,23 @@ function selectPhilosopher(key) {
 
   const card = document.getElementById('philosopher-card');
   const bust = document.getElementById('bust');
-  const bustGroup = document.getElementById('bustGroup');
+  const info = document.getElementById('info');
+  const memberPicker = document.getElementById('memberPicker');
 
   if (key === 'group') {
     card.className = 'philosopher-card group';
     bust.style.display = 'none';
-    bustGroup.style.display = 'flex';
-    document.getElementById('pname').childNodes[0].textContent = '円卓会議';
-    document.getElementById('pgreek').textContent = '';
-    document.getElementById('pyears').textContent = '4 人の賢者が集う';
-    document.getElementById('pquote').textContent = '— 問いを投げよ。彼らは共に考える —';
+    info.style.display = 'none';
+    memberPicker.style.display = 'flex';
+    updateMemberChips();
     chat.innerHTML = chatsByPhilosopher[key] ||
-      '<div class="initial-prompt">テーマを投げよ。<br>4 人の賢者が、順に答えを返すだろう。</div>';
+      '<div class="initial-prompt">テーマを投げよ。<br>選んだ賢者たちが、それぞれ答えを返すだろう。</div>';
   } else {
     const p = PHILOSOPHERS[key];
     card.className = 'philosopher-card ' + p.color;
     bust.style.display = '';
-    bustGroup.style.display = 'none';
+    info.style.display = '';
+    memberPicker.style.display = 'none';
     bust.src = '/static/philosophers/' + p.portrait;
     document.getElementById('pname').childNodes[0].textContent = p.name;
     document.getElementById('pgreek').textContent = p.greek;
@@ -1002,7 +1115,11 @@ async function sendGroup(message) {
     const res = await fetch('/group-chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({session_id: SESSION_ID, message})
+      body: JSON.stringify({
+        session_id: SESSION_ID,
+        message,
+        members: Array.from(selectedMembers),
+      })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
