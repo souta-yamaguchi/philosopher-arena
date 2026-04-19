@@ -92,12 +92,29 @@ LENGTH_RULE = """
 全哲学者共通、破ってはならぬルール。
 """
 
+GROUP_RULE = """
+
+---
+
+## 【円卓会議・応答ルール（最優先）】
+
+あなたは他の賢者たちと同じ問いに答えている。聞き手は複数の立場を読み比べたい。
+- **2〜3 文で終えよ。最大でも 4 文。**
+- 前置き・お世辞・自己紹介は禁止。冒頭から自分の核心を語れ
+- あなた **だけ** の独自の視点・方法・結論を際立たせよ（他の誰でも言えそうな一般論は書くな）
+- あなたの思想を象徴する語彙・切り口（例：ソクラテスなら問い返し、ニーチェなら生と力、カントなら義務と普遍、ウィトゲンシュタインなら言語と沈黙）を必ず一度は用いよ
+- 箇条書き・見出し・水平線・段落分けは禁止。一続きの短い文章で答えよ
+- 語尾・口調は従来の人物像のまま。短くても人格は保て
+"""
+
 
 def load_persona(name: str) -> str:
     return (BASE / "philosophers" / f"{name}.md").read_text(encoding="utf-8")
 
 
-PERSONAS = {k: load_persona(k) + LENGTH_RULE for k in PHILOSOPHERS}
+_RAW_PERSONAS = {k: load_persona(k) for k in PHILOSOPHERS}
+PERSONAS = {k: v + LENGTH_RULE for k, v in _RAW_PERSONAS.items()}
+GROUP_PERSONAS = {k: v + GROUP_RULE for k, v in _RAW_PERSONAS.items()}
 
 
 # ── Rate limiting ─────────────────────────────────────────────
@@ -268,14 +285,14 @@ def group_chat():
             system_blocks = [
                 {
                     "type": "text",
-                    "text": PERSONAS[key],
+                    "text": GROUP_PERSONAS[key],
                     "cache_control": {"type": "ephemeral"},
                 }
             ]
             full_text = ""
             with client.messages.stream(
                 model="claude-sonnet-4-5",
-                max_tokens=1000,
+                max_tokens=400,
                 system=system_blocks,
                 messages=history,
             ) as stream:
