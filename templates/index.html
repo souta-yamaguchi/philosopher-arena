@@ -640,79 +640,107 @@
       font-size: 12px !important;
     }
 
-    body { overflow: auto; }
+    body { overflow: hidden; }
 
     .container {
-      padding: 10px;
+      padding: 0;
       flex: 1;
       display: flex;
       flex-direction: column;
-      height: auto;
+      height: calc(100dvh - 42px);
       min-height: 0;
-      overflow: visible;
+      overflow: hidden;
     }
 
-    /* モバイルは上段に横並びセレクタ、下段にメインパネル */
+    /* モバイルは上段にコンパクトなアバター行、下段にメインパネル */
     .sidebar {
       width: 100%;
       flex-shrink: 0;
       border-right: none;
       border-bottom: 1px solid #d8cfb3;
-      padding: 6px;
-      background: transparent;
+      padding: 6px 8px;
+      background: #f9f4e2;
       max-height: none;
-      overflow: visible;
+      overflow-x: auto;
+      overflow-y: hidden;
     }
     .main-panel {
+      flex: 1;
       min-height: 0;
+      overflow: hidden;
     }
 
-    /* セレクタは横並び 5 列のグリッドに戻す */
+    /* セレクタ：アイコンだけの横並び（名前は非表示で省スペース） */
     .selector {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 6px;
-      flex-direction: unset;
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+      justify-content: space-around;
+      align-items: center;
     }
     .selector .card {
-      padding: 8px 4px;
+      padding: 3px;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      gap: 3px;
+      gap: 0;
+      flex: 1 0 auto;
+      background: transparent;
+      border: 2px solid transparent;
+    }
+    .selector .card.active {
+      background: transparent;
+      border-color: var(--gold);
+      box-shadow: none;
     }
     .selector .icon,
     .selector .icon-group {
-      width: 44px;
-      height: 44px;
+      width: 42px;
+      height: 42px;
       margin: 0;
+      border-width: 2px;
     }
-    .selector .card-info {
-      align-items: center;
-      overflow: visible;
-    }
-    .selector .pname {
-      font-size: 12px;
-      letter-spacing: 1px;
-    }
-    .selector .pyears {
-      display: none;
-    }
-    .philosopher-card.group .bust-group img {
-      width: 36px;
-      height: 36px;
-    }
+    .selector .card-info { display: none; }   /* モバイルでは名前非表示（スペース確保）*/
 
-    /* 哲学者カードはコンパクトに */
+    /* 哲学者カード（ヘッダー）はコンパクトに */
     .philosopher-card {
-      padding: 10px 14px;
-      gap: 12px;
-      margin-bottom: 10px;
+      padding: 8px 12px;
+      gap: 10px;
+      margin-bottom: 0;
     }
     .philosopher-card .bust {
-      width: 56px;
-      height: 56px;
+      width: 44px;
+      height: 44px;
       border-width: 2px;
+    }
+
+    /* 円卓会議時のメンバー選択：アイコンだけ、コンパクトに */
+    .picker-title {
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+    .picker-title .picker-sub { display: none; }
+    .picker-list { gap: 4px; }
+    .member-chip {
+      padding: 2px;
+      border-radius: 50%;
+    }
+    .member-chip img {
+      width: 32px;
+      height: 32px;
+    }
+    .member-chip .chip-name { display: none; }    /* 名前非表示（狭いので）*/
+    .member-chip .chip-check {
+      width: 14px;
+      height: 14px;
+      font-size: 9px;
+      top: -3px;
+      left: -3px;
+    }
+
+    .header-reset {
+      font-size: 10px !important;
+      padding: 4px 8px !important;
     }
     .philosopher-card .info h2 {
       font-size: 16px;
