@@ -306,11 +306,8 @@ def group_chat():
                 }
             ]
             full_text = ""
-            # 他哲学者の名前・見出し・水平線を書こうとしたら即停止
-            stop_sequences = [
-                "\n#", "\n---",
-                "# ソクラテス", "# ニーチェ", "# カント", "# ウィトゲンシュタイン",
-            ]
+            # 他哲学者の見出し・水平線を書こうとしたら即停止（API 上限 4 個以内）
+            stop_sequences = ["\n#", "\n---", "\n\n#", "\n\n---"]
             with client.messages.stream(
                 model="claude-sonnet-4-5",
                 max_tokens=220,
@@ -322,7 +319,12 @@ def group_chat():
                     full_text += text
                     yield f"data: {json.dumps({'philosopher': key, 'text': text}, ensure_ascii=False)}\n\n"
 
-            history.append({"role": "assistant", "content": full_text})
+            # 他哲学者の名前を書いてしまった場合は履歴に残さない（次回の模倣を防ぐ）
+            cleaned = full_text
+            for other_name in ("# ソクラテス", "# ニーチェ", "# カント", "# ウィトゲンシュタイン"):
+                if other_name in cleaned:
+                    cleaned = cleaned.split(other_name)[0].rstrip()
+            history.append({"role": "assistant", "content": cleaned or full_text})
 
         yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
 
