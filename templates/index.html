@@ -670,37 +670,52 @@
       overflow: hidden;
     }
 
-    /* セレクタ：アイコンだけの横並び（名前は非表示で省スペース） */
+    /* セレクタ：アイコン＋小さな名前の横並び */
     .selector {
       display: flex;
       flex-direction: row;
-      gap: 8px;
+      gap: 6px;
       justify-content: space-around;
-      align-items: center;
+      align-items: flex-start;
     }
     .selector .card {
-      padding: 3px;
+      padding: 4px 3px;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      gap: 0;
-      flex: 1 0 auto;
+      gap: 3px;
+      flex: 1 1 0;
+      min-width: 0;
       background: transparent;
       border: 2px solid transparent;
+      border-radius: 8px;
     }
     .selector .card.active {
-      background: transparent;
+      background: rgba(167, 125, 60, 0.1);
       border-color: var(--gold);
       box-shadow: none;
     }
     .selector .icon,
     .selector .icon-group {
-      width: 42px;
-      height: 42px;
+      width: 40px;
+      height: 40px;
       margin: 0;
       border-width: 2px;
     }
-    .selector .card-info { display: none; }   /* モバイルでは名前非表示（スペース確保）*/
+    .selector .card-info {
+      display: block;
+      width: 100%;
+      overflow: hidden;
+    }
+    .selector .pname {
+      font-size: 9.5px;
+      letter-spacing: 0;
+      line-height: 1.15;
+      white-space: normal;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+    .selector .pyears { display: none; }   /* 年数は非表示（名前だけ表示）*/
 
     /* 哲学者カード（ヘッダー）はコンパクトに */
     .philosopher-card {
@@ -714,7 +729,7 @@
       border-width: 2px;
     }
 
-    /* 円卓会議時のメンバー選択：アイコンだけ、コンパクトに */
+    /* 円卓会議時のメンバー選択：アイコン＋短い名前 */
     .picker-title {
       font-size: 12px;
       letter-spacing: 0.5px;
@@ -722,14 +737,19 @@
     .picker-title .picker-sub { display: none; }
     .picker-list { gap: 4px; }
     .member-chip {
-      padding: 2px;
-      border-radius: 50%;
+      padding: 2px 6px 2px 2px;
+      border-radius: 18px;
+      gap: 4px;
     }
     .member-chip img {
-      width: 32px;
-      height: 32px;
+      width: 26px;
+      height: 26px;
     }
-    .member-chip .chip-name { display: none; }    /* 名前非表示（狭いので）*/
+    .member-chip .chip-name {
+      display: inline;
+      font-size: 10px;
+      letter-spacing: 0;
+    }
     .member-chip .chip-check {
       width: 14px;
       height: 14px;
