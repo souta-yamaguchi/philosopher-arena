@@ -412,11 +412,17 @@
   .msg.ai.navy .avatar { border-color: var(--navy); }
   .msg.ai.slate .avatar { border-color: var(--slate); }
 
+  .msg .bubble-wrap {
+    min-width: 0;
+    max-width: 80%;
+    display: flex;
+    flex-direction: column;
+  }
+  .msg.user .bubble-wrap { align-items: flex-end; }
   .msg .bubble {
     background: var(--parchment);
     padding: 11px 15px;
     border-radius: 10px;
-    max-width: 75%;
     line-height: 1.75;
     font-size: 14.5px;
     border: 1px solid #d8cfb3;
@@ -791,20 +797,17 @@
       width: 38px;
       height: 38px;
     }
-    /* バブル外側の wrapper（addMessage で max-width:75% inline指定）を上書き */
-    .msg > div[style*="max-width"] {
-      max-width: calc(100% - 50px) !important;
+    .msg .bubble-wrap {
+      max-width: calc(100% - 50px);
       flex: 1;
     }
     .msg .bubble {
       padding: 10px 13px;
       font-size: 15px;
       line-height: 1.8;
-      max-width: 100%;
       word-break: normal;
       overflow-wrap: break-word;
     }
-    .msg.user .bubble { max-width: 100%; }
     .msg .name {
       font-size: 11px;
     }
@@ -962,6 +965,12 @@
 <script>
 const PHILOSOPHERS = {{ philosophers | tojson }};
 const SESSION_ID = 'sess-' + Math.random().toString(36).slice(2);
+
+// 「。」の後に改行を入れる（末尾の「。」は改行しない）
+function breakAfterPeriod(text) {
+  if (!text) return text;
+  return text.replace(/。(?!$)/g, '。\n');
+}
 const chat = document.getElementById('chat');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('sendBtn');
@@ -1043,7 +1052,7 @@ function addMessage(role, name, text, color, philosopherKey) {
   }
   msg.innerHTML = `
     ${avatarHtml}
-    <div style="max-width:75%">
+    <div class="bubble-wrap">
       <div class="name">${name}</div>
       <div class="bubble"><div class="text"></div></div>
     </div>
@@ -1066,7 +1075,7 @@ async function send() {
   }
 
   const p = PHILOSOPHERS[current];
-  addMessage('user', '君', message, '').textContent = message;
+  addMessage('user', '君', message, '').textContent = breakAfterPeriod(message);
   const textEl = addMessage('ai', p.name, '', p.color);
   textEl.innerHTML = '<span class="typing"></span><span class="typing"></span><span class="typing"></span>';
 
@@ -1118,7 +1127,10 @@ async function send() {
         const data = JSON.parse(line.slice(6));
         if (data.done) { streamDone = true; break; }
         if (data.text) {
-          for (const ch of data.text) charQueue.push(ch);
+          for (const ch of data.text) {
+            charQueue.push(ch);
+            if (ch === '。') charQueue.push('\n');
+          }
         }
       }
     }
@@ -1132,7 +1144,7 @@ async function send() {
 }
 
 async function sendGroup(message) {
-  addMessage('user', '君', message, '').textContent = message;
+  addMessage('user', '君', message, '').textContent = breakAfterPeriod(message);
 
   // 哲学者別に textEl を保持。text イベントに含まれる philosopher キー
   // を使って必ず正しいバブルへルーティングする（順序競合を根絶）
@@ -1202,7 +1214,10 @@ async function sendGroup(message) {
           // text イベントの philosopher キーで正しいバブルを特定
           const target = philosopherBubbles[data.philosopher];
           if (target) {
-            for (const ch of data.text) charQueue.push({ch, target});
+            for (const ch of data.text) {
+              charQueue.push({ch, target});
+              if (ch === '。') charQueue.push({ch: '\n', target});
+            }
           }
         } else if (data.done) {
           streamDone = true;
