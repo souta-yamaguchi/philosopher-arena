@@ -1,12 +1,14 @@
 """
 哲学者アリーナ — ソクラテス / ニーチェ / カント / ウィトゲンシュタイン
-- プロンプトキャッシュ (90% OFF)
+- 応答生成はローカルの Claude Code CLI (claude -p) — API 課金なし・サブスク枠
 - IP別レート制限 + 全体日次キャップ
 - 合言葉ゲート
 """
 import os
 import json
 import random
+import shutil
+import subprocess
 import time
 import secrets
 from pathlib import Path
@@ -15,13 +17,9 @@ from threading import Lock
 from functools import wraps
 from flask import (Flask, render_template, request, Response,
                    stream_with_context, jsonify, session, redirect, url_for)
-from anthropic import Anthropic
 from dotenv import load_dotenv
 
 BASE = Path(__file__).parent
-# ローカル開発: ai_news_app/.env からキーを読む
-load_dotenv(BASE.parent.parent / "ai_news_app" / ".env")
-# 本番: 同ディレクトリの .env もあれば読む
 load_dotenv(BASE / ".env")
 
 app = Flask(__name__)
@@ -30,7 +28,88 @@ app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 app.permanent_session_lifetime = 60 * 60 * 24 * 30
 
 PASSPHRASE = os.environ.get("PASSPHRASE", "オヨヨ")
-client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+# ── Claude Code CLI ───────────────────────────────────────────
+CLAUDE_BIN = shutil.which(os.environ.get("CLAUDE_BIN", "claude"))
+if not CLAUDE_BIN:
+    raise RuntimeError("claude CLI が見つかりません。PATH を確認するか CLAUDE_BIN を設定してください。")
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "sonnet")
+CLAUDE_TIMEOUT = int(os.environ.get("CLAUDE_TIMEOUT", "180"))
+# CLAUDE.md やフックを拾わないよう、専用の空ディレクトリを cwd にして実行する
+CLAUDE_CWD = BASE / "runtime"
+CLAUDE_CWD.mkdir(exist_ok=True)
+
+
+def _claude_cmd(persona_file: Path) -> list[str]:
+    """persona を system prompt に、ツール・ユーザー設定(CLAUDE.md/フック)を全て無効化。
+    複数行のプロンプトを argv に載せると Windows の .CMD シムで壊れるためファイル渡し。"""
+    return [
+        CLAUDE_BIN, "-p",
+        "--system-prompt-file", str(persona_file),
+        "--model", CLAUDE_MODEL,
+        "--tools", "",
+        "--setting-sources", "",
+    ]
+
+
+def _build_prompt(history: list[dict]) -> str:
+    """メモリ上の対話履歴を 1 本のプロンプトに畳む（claude -p は毎回ステートレス）。"""
+    if len(history) == 1:
+        return history[0]["content"]
+    lines = ["# これまでの対話（あなたと相手のやり取り）", ""]
+    for m in history[:-1]:
+        speaker = "相手" if m["role"] == "user" else "あなた"
+        lines.append(f"【{speaker}】{m['content']}")
+    lines += ["", "# 相手の新しい発言（これにあなたとして応答せよ）", history[-1]["content"]]
+    return "\n".join(lines)
+
+
+def _stream_claude(persona_file: Path, prompt: str):
+    """claude -p の stream-json 出力からテキスト差分を逐次 yield する。"""
+    cmd = _claude_cmd(persona_file) + [
+        "--output-format", "stream-json", "--include-partial-messages", "--verbose",
+    ]
+    proc = subprocess.Popen(
+        cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        cwd=str(CLAUDE_CWD), text=True, encoding="utf-8", errors="replace",
+    )
+    try:
+        proc.stdin.write(prompt)
+        proc.stdin.close()
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if obj.get("type") == "stream_event":
+                ev = obj.get("event", {})
+                if ev.get("type") == "content_block_delta":
+                    delta = ev.get("delta", {})
+                    if delta.get("type") == "text_delta" and delta.get("text"):
+                        yield delta["text"]
+            elif obj.get("type") == "result" and obj.get("is_error"):
+                raise RuntimeError(obj.get("result") or "claude CLI error")
+        proc.wait(timeout=CLAUDE_TIMEOUT)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+
+
+def _run_claude(persona_file: Path, prompt: str) -> str:
+    """claude -p を一括実行して最終テキストを返す（円卓会議用）。"""
+    cmd = _claude_cmd(persona_file) + ["--output-format", "json"]
+    res = subprocess.run(
+        cmd, input=prompt, capture_output=True,
+        cwd=str(CLAUDE_CWD), text=True, encoding="utf-8", errors="replace",
+        timeout=CLAUDE_TIMEOUT,
+    )
+    data = json.loads(res.stdout)
+    if data.get("is_error"):
+        raise RuntimeError(data.get("result") or "claude CLI error")
+    return data.get("result", "")
 
 
 @app.after_request
@@ -148,6 +227,19 @@ _RAW_PERSONAS = {k: load_persona(k) for k in PHILOSOPHERS}
 PERSONAS = {k: v + LENGTH_RULE for k, v in _RAW_PERSONAS.items()}
 # 円卓会議モード: ルールを前と後ろの両方に置いて効かせる
 GROUP_PERSONAS = {k: GROUP_RULE + "\n\n" + v + GROUP_RULE for k, v in _RAW_PERSONAS.items()}
+
+# claude -p に --system-prompt-file で渡すため、起動時にファイルへ書き出す
+_PERSONA_DIR = CLAUDE_CWD / "personas"
+_PERSONA_DIR.mkdir(exist_ok=True)
+PERSONA_FILES: dict[str, Path] = {}
+GROUP_PERSONA_FILES: dict[str, Path] = {}
+for _k in PHILOSOPHERS:
+    _pf = _PERSONA_DIR / f"{_k}.txt"
+    _pf.write_text(PERSONAS[_k], encoding="utf-8")
+    PERSONA_FILES[_k] = _pf
+    _gf = _PERSONA_DIR / f"{_k}_group.txt"
+    _gf.write_text(GROUP_PERSONAS[_k], encoding="utf-8")
+    GROUP_PERSONA_FILES[_k] = _gf
 
 
 def _sanitize_group_reply(text: str, speaker_key: str = "") -> str:
@@ -278,26 +370,18 @@ def chat():
     history = sess.setdefault(philosopher, [])
     history.append({"role": "user", "content": user_message})
 
-    system_prompt = PERSONAS[philosopher]
+    persona_file = PERSONA_FILES[philosopher]
 
     def generate():
         full_text = ""
-        system_blocks = [
-            {
-                "type": "text",
-                "text": system_prompt,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ]
-        with client.messages.stream(
-            model="claude-sonnet-4-5",
-            max_tokens=1000,
-            system=system_blocks,
-            messages=history,
-        ) as stream:
-            for text in stream.text_stream:
+        try:
+            for text in _stream_claude(persona_file, _build_prompt(history)):
                 full_text += text
                 yield f"data: {json.dumps({'text': text}, ensure_ascii=False)}\n\n"
+        except Exception:
+            yield f"data: {json.dumps({'error': '賢者との交信が途絶えた。時をおいて再び問いかけよ。'}, ensure_ascii=False)}\n\n"
+            history.pop()  # 失敗したユーザ発言は履歴から取り除く
+            return
         history.append({"role": "assistant", "content": full_text})
         yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
 
@@ -354,31 +438,10 @@ def group_chat():
 
             yield f"data: {json.dumps({'start': key}, ensure_ascii=False)}\n\n"
 
-            system_blocks = [
-                {
-                    "type": "text",
-                    "text": GROUP_PERSONAS[key],
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ]
-            # 返答の最初を「#」でないトークンに誘導するプレフィル
-            prefill = "——"
-            messages_with_prefill = history + [{"role": "assistant", "content": prefill}]
-
-            full_text = ""
-            stop_sequences = ["\n#", "\n---", "\n\n#", "\n\n---"]
-            with client.messages.stream(
-                model="claude-sonnet-4-5",
-                max_tokens=220,
-                system=system_blocks,
-                messages=messages_with_prefill,
-                stop_sequences=stop_sequences,
-            ) as stream:
-                for text in stream.text_stream:
-                    full_text += text
-
-            # prefill を含めて最終テキストを組み立て → クリーン
-            raw = prefill + full_text
+            try:
+                raw = _run_claude(GROUP_PERSONA_FILES[key], _build_prompt(history))
+            except Exception:
+                raw = ""
             cleaned = _sanitize_group_reply(raw, speaker_key=key)
             # 一括でクライアントへ（クライアント側で1文字ずつアニメする）
             yield f"data: {json.dumps({'philosopher': key, 'text': cleaned}, ensure_ascii=False)}\n\n"
@@ -393,7 +456,6 @@ def group_chat():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
         },
     )
 
